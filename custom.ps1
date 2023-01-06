@@ -29,9 +29,9 @@ Invoke-Expression $Notepad
 
 # Variables
 $verbosePreference = 'Continue'
-#$vdot = 'https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool/archive/refs/heads/main.zip' 
-$vdot = 'https://slvavdscripts2022.blob.core.windows.net/scripts/Virtual-Desktop-Optimization-Tool-main.zip' 
-$apppackages = 'https://slvavdscripts2022.blob.core.windows.net/scripts/AppxPackages.json'
+$vdot = 'https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool/archive/refs/heads/main.zip' 
+#$vdot = 'https://github.com/admada/aib/raw/main/Virtual-Desktop-Optimization-Tool-main.zip' 
+$apppackages = 'https://github.com/admada/aib/raw/main/AppxPackages.json'
 $vdot_location = 'c:\Optimize' 
 $vdot_location_zip = 'c:\Optimize\vdot.zip'
 $apppackages_location = 'C:\Optimize\AppxPackages.json'
