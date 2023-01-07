@@ -85,7 +85,7 @@ cd $vdot_folder
 
 Write-Verbose "Run VDOT" 
 Set-ExecutionPolicy -ExecutionPolicy bypass -Scope Process -Force
-./Windows_VDOT.ps1 -Optimizations All -AdvancedOptimizations All -Verbose -AcceptEULA -Restart
+./Windows_VDOT.ps1 -Optimizations All -AdvancedOptimizations All -Verbose -AcceptEULA 
 
 # Sleep 5 seconds
 sleep 5
@@ -116,6 +116,4 @@ Set-TimeZone -Name "W. Europe Standard Time" -PassThru
 
 
 
-# Sysprep Host
-Invoke-Expression -Command "c:\windows\system32\sysprep\sysprep.exe /generalize /shutdown /oobe" 
 
