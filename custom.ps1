@@ -20,9 +20,8 @@ ForEach ($PackageName in $Packages)
 
 ## WinGet
 
-$Notepad  = 'winget install notepad++'
-
-Invoke-Expression $Notepad
+#$Notepad  = 'winget install notepad++'
+#Invoke-Expression $Notepad
 
 
 # install Teams in VDI Mode
