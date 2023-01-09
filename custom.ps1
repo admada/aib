@@ -25,6 +25,38 @@ $Notepad  = 'winget install notepad++'
 Invoke-Expression $Notepad
 
 
+# install Teams in VDI Mode
+reg add "HKLM\SOFTWARE\Microsoft\Teams" /v IsWVDEnvironment /t REG_DWORD /d 1 /f
+
+    $deploy = "C:\Solvinity\Deploy"
+    if (Test-Path $deploy) {
+       
+        Write-Host "Folder Exists"
+        # Perform Delete file from folder operation
+    }
+    else
+    {
+      
+        
+        New-Item $deploy -ItemType Directory
+        Write-Host "Folder Created successfully"
+    }
+    
+#Download RDCWEBRTCSvc
+invoke-WebRequest -Uri https://aka.ms/msrdcwebrtcsvc/msi -OutFile "C:\Solvinity\Deploy\MsRdcWebRTCSvc_HostSetup_x64.msi"
+Start-Sleep -s 5
+#Download Teams 
+invoke-WebRequest -Uri "https://teams.microsoft.com/downloads/desktopurl?env=production&plat=windows&arch=x64&managedInstaller=true&download=true" -OutFile "C:\Solvinity\Deploy\Teams_windows_x64.msi"
+Start-Sleep -s 5
+
+
+#Install MSRDCWEBTRCSVC
+msiexec /i "C:\Solvinity\Deploy\MsRdcWebRTCSvc_HostSetup_x64.msi"  /n
+Start-Sleep -s 60
+# Install Teams
+msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt ALLUSER=1 
+Start-Sleep -s 30
+
 ######## Host Optimalization ##
 
 # Variables
