@@ -1,0 +1,87 @@
+###########################################
+# Pipline task: Azure Virtual Desktop Image builder process
+# Pipeline owner: Andreas Daalder
+# Version: v1.0 
+# Creation Date: 09-01-2023
+#
+# ############## Change log ###############
+# Changes: Rule #
+# Change by: your name!
+# Last Change date: xx-xx-xxxx
+###########################################
+
+
+
+# trigger:
+# - main
+trigger: none
+pr: none
+
+pool:
+  name: Azure-pipelines-Self
+  demands:
+   - agent.name -equals DC2019
+
+variables:
+- group: AIB-Variable
+
+jobs:
+- job:
+  displayName: "Image Builder Job"
+  steps:
+  - task: AzurePowerShell@5
+    displayName: "Build Template JSON File"
+    inputs:
+      azureSubscription: 'tf-Azure-spn'
+      ScriptType: 'InlineScript'
+      Inline: |
+        $galleryImageId = "/subscriptions/$(SubscriptionId)/ResourceGroups/$(ResourceGroup)/providers/Microsoft.Compute/galleries/$(ACG)/images/$(GalleryImageId)"
+        $imgBuilderId = "/subscriptions/$(SubscriptionId)/ResourceGroups/$(ResourceGroup)/providers/Microsoft.ManagedIdentity/userAssignedIdentities/$(ManagedIdenityName)"
+        $Template_File = 'Win11Multi22H2.json'
+        ((Get-Content -path $Template_File -Raw) -replace '<offer>',"$(Offer)") | Set-Content -Path $Template_File
+        ((Get-Content -path $Template_File -Raw) -replace '<runoutput>',"$(runoutputname)") | Set-Content -Path $Template_File
+        ((Get-Content -path $Template_File -Raw) -replace '<imagetemplate>',"$(imagetemplatename)") | Set-Content -Path $Template_File
+        ((Get-Content -path $Template_File -Raw) -replace '<svclocation>',"$(Location)") | Set-Content -Path $Template_File
+        ((Get-Content -path $Template_File -Raw) -replace '<vmSize>',"$(vmSize)") | Set-Content -Path $Template_File
+        ((Get-Content -path $Template_File -Raw) -replace '<api-version>',"$(api-version)") | Set-Content -Path $Template_File
+        ((Get-Content -path $Template_File -Raw) -replace '<sku>',"$(Sku)") | Set-Content -Path $Template_File
+        ((Get-Content -path $Template_File -Raw) -replace '<galleryImageId>',$galleryImageId) | Set-Content -Path $Template_File
+        ((Get-Content -path $Template_File -Raw) -replace '<imgBuilderId>',$imgBuilderId) | Set-Content -Path $Template_File
+        
+      azurePowerShellVersion: 'LatestVersion'
+  
+  - task: AzureResourceManagerTemplateDeployment@3
+    displayName: "Deploy ARM Template"
+    continueOnError: true
+    inputs:
+      deploymentScope: 'Resource Group'
+      azureResourceManagerConnection: 'tf-Azure-spn'
+      subscriptionId: $(SubscriptionId)
+      action: 'Create Or Update Resource Group'
+      resourceGroupName: '$(ResourceGroup)'
+      location: '$(Location)'
+      templateLocation: 'Linked artifact'
+      csmFile: 'Win11Multi22H2.json'
+      csmParametersFile: 'Win11Multi22H2.parameters.json'
+      deploymentMode: 'Incremental'
+  - task: AzurePowerShell@5
+    displayName: "Install ImageBuilder"
+    inputs:
+      azureSubscription: 'tf-Azure-spn'
+      ScriptType: 'InlineScript'
+      Inline: 'Install-Module -name Az.ImageBuilder -AllowPrerelease -Force -Scope CurrentUser'
+      azurePowerShellVersion: 'LatestVersion'
+  - task: AzurePowerShell@5
+    displayName: "Build the Image"
+    inputs:
+      azureSubscription: 'tf-Azure-spn'
+      ScriptType: 'InlineScript'
+      Inline: 'Start-AzImageBuilderTemplate -ResourceGroupName $(ResourceGroup) -Name $(ImageTemplateName)'
+      azurePowerShellVersion: 'LatestVersion'
+  - task: AzurePowerShell@5
+    displayName: "Destroy Template"
+    inputs:
+      azureSubscription: 'tf-Azure-spn'
+      ScriptType: 'InlineScript'
+      Inline: 'Remove-AzImageBuilderTemplate -ImageTemplateName $(ImageTemplateName) -ResourceGroupName $(ResourceGroup)'
+      azurePowerShellVersion: 'LatestVersion'
