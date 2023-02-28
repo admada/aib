@@ -53,7 +53,7 @@ Start-Sleep -s 5
 msiexec /i "C:\Solvinity\Deploy\MsRdcWebRTCSvc_HostSetup_x64.msi"  /n
 Start-Sleep -s 60
 # Install Teams
-msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt ALLUSER=1 
+msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt  /QN OPTIONS="noAutoStart=true" ALLUSER=1
 Start-Sleep -s 30
 
 ######## Host Optimalization ##
