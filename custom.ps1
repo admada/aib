@@ -81,7 +81,7 @@ Function Install-WinGet {
     }
     Write-Verbose "[$((Get-Date).TimeofDay)] Ending $($myinvocation.mycommand)"
 }
-
+Install-WinGet
 ## End installation WinGet
 
 #-------------------------------------------------
