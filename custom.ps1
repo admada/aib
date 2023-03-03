@@ -1,4 +1,3 @@
-
 ######## Install default software
 #Create temp folder
 New-Item -Path 'C:\Temp' -ItemType Directory -Force | Out-Null
@@ -9,19 +8,92 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
 #Assign Packages to Install
-$Packages = 'googlechrome',`
-            'adobereader',
-            'keepass'
+# $Packages = 'googlechrome',`
+#             'adobereader',
+#             'keepass'
 
-#Install Packages
-ForEach ($PackageName in $Packages)
-{choco install $PackageName -y}
+# #Install choco Packages
+# ForEach ($PackageName in $Packages)
+# {choco install $PackageName -y}
 
+## Install WinGet
 
-## WinGet
+Function Install-WinGet {
+    #Install the latest package from GitHub
+    [cmdletbinding(SupportsShouldProcess)]
+    [alias("iwg")]
+    [OutputType("None")]
+    [OutputType("Microsoft.Windows.Appx.PackageManager.Commands.AppxPackage")]
+    Param(
+        [Parameter(HelpMessage = "Display the AppxPackage after installation.")]
+        [switch]$Passthru
+    )
 
-#$Notepad  = 'winget install notepad++'
-#Invoke-Expression $Notepad
+    Write-Verbose "[$((Get-Date).TimeofDay)] Starting $($myinvocation.mycommand)"
+
+    if ($PSVersionTable.PSVersion.Major -eq 7) {
+        Write-Warning "This command does not work in PowerShell 7. You must install in Windows PowerShell."
+        return
+    }
+
+    #test for requirement
+    $Requirement = Get-AppPackage "Microsoft.DesktopAppInstaller"
+    if (-Not $requirement) {
+        Write-Verbose "Installing Desktop App Installer requirement"
+        Try {
+            Add-AppxPackage -Path "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -erroraction Stop
+        }
+        Catch {
+            Throw $_
+        }
+    }
+
+    $uri = "https://api.github.com/repos/microsoft/winget-cli/releases"
+
+    Try {
+        Write-Verbose "[$((Get-Date).TimeofDay)] Getting information from $uri"
+        $get = Invoke-RestMethod -uri $uri -Method Get -ErrorAction stop
+
+        Write-Verbose "[$((Get-Date).TimeofDay)] getting latest release"
+        #$data = $get | Select-Object -first 1
+        $data = $get[0].assets | Where-Object name -Match 'msixbundle'
+
+        $appx = $data.browser_download_url
+        #$data.assets[0].browser_download_url
+        Write-Verbose "[$((Get-Date).TimeofDay)] $appx"
+        If ($pscmdlet.ShouldProcess($appx, "Downloading asset")) {
+            $file = Join-Path -path $env:temp -ChildPath $data.name
+
+            Write-Verbose "[$((Get-Date).TimeofDay)] Saving to $file"
+            Invoke-WebRequest -Uri $appx -UseBasicParsing -DisableKeepAlive -OutFile $file
+
+            Write-Verbose "[$((Get-Date).TimeofDay)] Adding Appx Package"
+            Add-AppxPackage -Path $file -ErrorAction Stop
+
+            if ($passthru) {
+                Get-AppxPackage microsoft.desktopAppInstaller
+            }
+        }
+    } #Try
+    Catch {
+        Write-Verbose "[$((Get-Date).TimeofDay)] There was an error."
+        Throw $_
+    }
+    Write-Verbose "[$((Get-Date).TimeofDay)] Ending $($myinvocation.mycommand)"
+}
+
+## End installation WinGet
+
+#-------------------------------------------------
+# Install Software via WinGet
+#-------------------------------------------------
+
+$WinGetApps = 'Google.Chrome',
+              'Adobe.Acrobat.Reader.64-bit',
+              'DominikReichl.KeePass'    
+
+ForEach ($Apps in $WinGetApps)
+{winget install $Apps}
 
 
 # install Teams in VDI Mode
@@ -48,12 +120,11 @@ Start-Sleep -s 5
 invoke-WebRequest -Uri "https://teams.microsoft.com/downloads/desktopurl?env=production&plat=windows&arch=x64&managedInstaller=true&download=true" -OutFile "C:\Solvinity\Deploy\Teams_windows_x64.msi"
 Start-Sleep -s 5
 
-
 #Install MSRDCWEBTRCSVC
 msiexec /i "C:\Solvinity\Deploy\MsRdcWebRTCSvc_HostSetup_x64.msi"  /n
 Start-Sleep -s 60
 # Install Teams
-msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt  /QN OPTIONS="noAutoStart=true" ALLUSER=1
+msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt ALLUSER=1 
 Start-Sleep -s 30
 
 ######## Host Optimalization ##
@@ -135,7 +206,7 @@ if(Test-Path $WinstationsKey){
     New-ItemProperty -Path $WinstationsKey -Name 'UdpPortNumber' -ErrorAction:SilentlyContinue -PropertyType:dword -Value 3390 -Force
     New-ItemProperty -Path $WinstationsKey -Name 'ICEControl' -ErrorAction:SilentlyContinue -PropertyType:dword -Value 2 -Force
 
-# RDP FPS optimization
+    # RDP FPS optimization
     New-ItemProperty -Path $WinstationsKey -Name 'DWMFRAMEINTERVAL' -ErrorAction:SilentlyContinue -PropertyType:dword -Value 15 -Force
 }
 
@@ -146,7 +217,3 @@ New-NetQosPolicy -Name "RDP Shortpath for managed networks" -AppPathNameMatchCon
 ## Set Time Zone   
 
 Set-TimeZone -Name "W. Europe Standard Time" -PassThru
-
-
-
-
