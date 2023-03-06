@@ -17,11 +17,20 @@ Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://cho
 # {choco install $PackageName -y}
 
 ## Install WinGet
-Set-PSRepository PSGallery -InstallationPolicy Trusted
-Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-Install-Module -Name WingetTools
-Install-WinGet
-winget upgrade --all --silent --accept-package-agreements --accept-source-agreements --force
+$URL = "https://api.github.com/repos/microsoft/winget-cli/releases/latest"
+$URL = (Invoke-WebRequest -Uri $URL).Content | ConvertFrom-Json |
+        Select-Object -ExpandProperty "assets" |
+        Where-Object "browser_download_url" -Match '.msixbundle' |
+        Select-Object -ExpandProperty "browser_download_url"
+
+# download
+Invoke-WebRequest -Uri $URL -OutFile "Setup.msix" -UseBasicParsing
+
+# install
+Add-AppxPackage -Path "Setup.msix"
+
+# delete file
+Remove-Item "Setup.msix"
 
 ## End installation WinGet
 
@@ -34,7 +43,7 @@ $WinGetApps = 'Google.Chrome',
               'DominikReichl.KeePass'    
 
 ForEach ($Apps in $WinGetApps)
-{winget install $Apps}
+{winget install $Apps --accept-package-agreements --accept-source-agreements}
 
 
 
