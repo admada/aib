@@ -8,13 +8,34 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
 #Assign Packages to Install
-$Packages = 'googlechrome',`
-            'adobereader',
-            'keepass'
+# $Packages = 'googlechrome',`
+#             'adobereader',
+#             'keepass'
 
-#Install Packages
-ForEach ($PackageName in $Packages)
-{choco install $PackageName -y}
+# #Install choco Packages
+# ForEach ($PackageName in $Packages)
+# {choco install $PackageName -y}
+
+## Install WinGet
+Set-PSRepository PSGallery -InstallationPolicy Trusted
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+Install-Module -Name WingetTools
+Install-WinGet
+winget upgrade --all --silent --accept-package-agreements --accept-source-agreements --force
+
+## End installation WinGet
+
+#-------------------------------------------------
+# Install Software via WinGet
+#-------------------------------------------------
+
+$WinGetApps = 'Google.Chrome',
+              'Adobe.Acrobat.Reader.64-bit',
+              'DominikReichl.KeePass'    
+
+ForEach ($Apps in $WinGetApps)
+{winget install $Apps}
+
 
 
 # install Teams in VDI Mode
@@ -43,10 +64,10 @@ Start-Sleep -s 5
 
 
 #Install MSRDCWEBTRCSVC
-msiexec /i "C:\Solvinity\Deploy\MsRdcWebRTCSvc_HostSetup_x64.msi"  /n
+msiexec /i "C:\Solvinity\Deploy\MsRdcWebRTCSvc_HostSetup_x64.msi"  /qn
 Start-Sleep -s 60
 # Install Teams
-msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt ALLUSER=1 
+msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt ALLUSER=1 /qn
 Start-Sleep -s 30
 
 ######## Host Optimalization ##
