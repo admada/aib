@@ -8,92 +8,13 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
 #Assign Packages to Install
-# $Packages = 'googlechrome',`
-#             'adobereader',
-#             'keepass'
+$Packages = 'googlechrome',`
+            'adobereader',
+            'keepass'
 
-# #Install choco Packages
-# ForEach ($PackageName in $Packages)
-# {choco install $PackageName -y}
-
-## Install WinGet
-
-Function Install-WinGet {
-    #Install the latest package from GitHub
-    [cmdletbinding(SupportsShouldProcess)]
-    [alias("iwg")]
-    [OutputType("None")]
-    [OutputType("Microsoft.Windows.Appx.PackageManager.Commands.AppxPackage")]
-    Param(
-        [Parameter(HelpMessage = "Display the AppxPackage after installation.")]
-        [switch]$Passthru
-    )
-
-    Write-Verbose "[$((Get-Date).TimeofDay)] Starting $($myinvocation.mycommand)"
-
-    if ($PSVersionTable.PSVersion.Major -eq 7) {
-        Write-Warning "This command does not work in PowerShell 7. You must install in Windows PowerShell."
-        return
-    }
-
-    #test for requirement
-    $Requirement = Get-AppPackage "Microsoft.DesktopAppInstaller"
-    if (-Not $requirement) {
-        Write-Verbose "Installing Desktop App Installer requirement"
-        Try {
-            Add-AppxPackage -Path "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -erroraction Stop
-        }
-        Catch {
-            Throw $_
-        }
-    }
-
-    $uri = "https://api.github.com/repos/microsoft/winget-cli/releases"
-
-    Try {
-        Write-Verbose "[$((Get-Date).TimeofDay)] Getting information from $uri"
-        $get = Invoke-RestMethod -uri $uri -Method Get -ErrorAction stop
-
-        Write-Verbose "[$((Get-Date).TimeofDay)] getting latest release"
-        #$data = $get | Select-Object -first 1
-        $data = $get[0].assets | Where-Object name -Match 'msixbundle'
-
-        $appx = $data.browser_download_url
-        #$data.assets[0].browser_download_url
-        Write-Verbose "[$((Get-Date).TimeofDay)] $appx"
-        If ($pscmdlet.ShouldProcess($appx, "Downloading asset")) {
-            $file = Join-Path -path $env:temp -ChildPath $data.name
-
-            Write-Verbose "[$((Get-Date).TimeofDay)] Saving to $file"
-            Invoke-WebRequest -Uri $appx -UseBasicParsing -DisableKeepAlive -OutFile $file
-
-            Write-Verbose "[$((Get-Date).TimeofDay)] Adding Appx Package"
-            Add-AppxPackage -Path $file -ErrorAction Stop
-
-            if ($passthru) {
-                Get-AppxPackage microsoft.desktopAppInstaller
-            }
-        }
-    } #Try
-    Catch {
-        Write-Verbose "[$((Get-Date).TimeofDay)] There was an error."
-        Throw $_
-    }
-    Write-Verbose "[$((Get-Date).TimeofDay)] Ending $($myinvocation.mycommand)"
-}
-Install-WinGet
-## End installation WinGet
-
-#-------------------------------------------------
-# Install Software via WinGet
-#-------------------------------------------------
-
-$WinGetApps = 'Google.Chrome',
-              'Adobe.Acrobat.Reader.64-bit',
-              'DominikReichl.KeePass'    
-
-ForEach ($Apps in $WinGetApps)
-{winget install $Apps}
+#Install Packages
+ForEach ($PackageName in $Packages)
+{choco install $PackageName -y}
 
 
 # install Teams in VDI Mode
@@ -119,6 +40,7 @@ Start-Sleep -s 5
 #Download Teams 
 invoke-WebRequest -Uri "https://teams.microsoft.com/downloads/desktopurl?env=production&plat=windows&arch=x64&managedInstaller=true&download=true" -OutFile "C:\Solvinity\Deploy\Teams_windows_x64.msi"
 Start-Sleep -s 5
+
 
 #Install MSRDCWEBTRCSVC
 msiexec /i "C:\Solvinity\Deploy\MsRdcWebRTCSvc_HostSetup_x64.msi"  /n
@@ -212,6 +134,7 @@ if(Test-Path $WinstationsKey){
 
 New-NetFirewallRule -DisplayName 'Remote Desktop - Shortpath (UDP-In)'  -Action Allow -Description 'Inbound rule for the Remote Desktop service to allow RDP traffic. [UDP 3390]' -Group '@FirewallAPI.dll,-28752' -Name 'RemoteDesktop-UserMode-In-Shortpath-UDP'  -PolicyStore PersistentStore -Profile Domain, Private -Service TermService -Protocol udp -LocalPort 3390 -Program '%SystemRoot%\system32\svchost.exe' -Enabled:True
 New-NetQosPolicy -Name "RDP Shortpath for managed networks" -AppPathNameMatchCondition "svchost.exe" -IPProtocolMatchCondition UDP -IPSrcPortStartMatchCondition 3390 -IPSrcPortEndMatchCondition 3390 -DSCPAction 46 -NetworkProfile All
+
 
 
 ## Set Time Zone   
