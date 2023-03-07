@@ -1,11 +1,46 @@
-######## Install default software
+#----------------------------
+# ImageBuilder Deploy script
+# Version: v1.0
+# Date: 07-03-2023
+# Owner: Andreas Daalder
+# Modifyed By:
+# Modify date: xx-xx-xxxx
+#----------------------------
+
+#-------------------------------------------------
+# Install Software via WinGet
+#-------------------------------------------------
+
+$WinGetApps = 'Google.Chrome',
+              'Adobe.Acrobat.Reader.64-bit',
+              'DominikReichl.KeePass' 
+
+###################################################              
+
+$deploy = "C:\Solvinity\Deploy"
+if (Test-Path $deploy) {
+   
+    Write-Host "" $deploy " Folder Exists"
+ 
+}
+else
+{
+      
+    New-Item $deploy -ItemType Directory
+    Write-Host "" $deploy " Folder Created successfully"
+}
+
+$PackageName	= "ImageBuilder"
+Start-Transcript -Path "C:\Solvinity\Logs\$($PackageName)_Install.log" -Append
+
+
 #Create temp folder
 New-Item -Path 'C:\Temp' -ItemType Directory -Force | Out-Null
 
 #Install Chocolatey
-Set-ExecutionPolicy Bypass -Scope Process -Force
-[Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
-Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+# Set-ExecutionPolicy Bypass -Scope Process -Force
+# [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
+# Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
 #Assign Packages to Install
 # $Packages = 'googlechrome',`
@@ -17,69 +52,49 @@ Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://cho
 # {choco install $PackageName -y}
 
 ## Install WinGet
-If ($PSVersionTable.PSVersion -ge [version]"5.0" -and (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full\').Release -ge 379893) {
+If ((Get-PackageProvider -Name NuGet).version -lt 2.8.5.201){
+    Try {
+         Write-Host "Installing NuGet."
+         Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Confirm:$false -Scope CurrentUser }
 
-    If ([Net.ServicePointManager]::SecurityProtocol -ne [Net.SecurityProtocolType]::SystemDefault) {
-         Try { [Net.ServicePointManager]::SecurityProtocol = @([Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12)}
-         Catch { Exit }
-    }
-
-    If ((Get-PackageProvider).Name -notcontains "NuGet") {
-        Try { Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction Stop }
-        Catch { Exit }
-    }
-    $ArrPSRepos = Get-PSRepository
-    If ($ArrPSRepos.Name -notcontains "PSGallery") {
-        Try { Register-PSRepository -Default -InstallationPolicy Trusted -ErrorAction Stop }
-        Catch { Exit }
-    } ElseIf ($ArrPSRepos | ?{$_.Name -eq "PSGallery" -and $_.InstallationPolicy -ne "Trusted"}) {
-        Try { Set-PSRepository PSGallery -InstallationPolicy Trusted -ErrorAction Stop }
-        Catch { Exit }
-    }
-    If ((Get-Module -ListAvailable).Name -notcontains "PSReadLine") {
-        Try { Install-Module PSReadLine -Force -ErrorAction Stop }
-        Catch { Exit }
-    }
-
+    Catch [Exception]{
+         $_.message
+         Exit}
 }
 
+Set-ExecutionPolicy RemoteSigned
+$MyLink = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
 
-Install-Module -Name WingetTools
-Install-WinGet
+Write-Host "Winget is being downloaded"
 
-winget upgrade --all --silent --accept-package-agreements --accept-source-agreements --force
+Invoke-WebRequest -Uri $MyLink -OutFile "C:\Solvinity\Deploy\WinGet.msixbundle"
+Write-Host "Winget installer downloaded, launching installer."
+$localFolderPath = "C:\Solvinity\Deploy"
+$localPackage = "C:\Solvinity\Deploy\WinGet.msixbundle"
+
+DISM.EXE /Online /Add-ProvisionedAppxPackage /PackagePath:$localPackage /SkipLicense
 
 ## End installation WinGet
 
-#-------------------------------------------------
-# Install Software via WinGet
-#-------------------------------------------------
+## Start installation of Applications
 
-$WinGetApps = 'Google.Chrome',
-              'Adobe.Acrobat.Reader.64-bit',
-              'DominikReichl.KeePass'    
-
+ $winget_exe = Resolve-Path "C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe"
+      if ($winget_exe.count -gt 1){
+          $winget_exe = $winget_exe[-1].Path
+              }
+              
+              if (!$winget_exe){Write-Error "Winget not installed"} 
+              
+              
 ForEach ($Apps in $WinGetApps)
-{winget install $Apps --accept-package-agreements --accept-source-agreements}
-
+{ & $winget_exe install $Apps --silent --accept-package-agreements --accept-source-agreements --scope=machine 
+   Write-Host "" $Apps " Installed"
+}
 
 
 # install Teams in VDI Mode
 reg add "HKLM\SOFTWARE\Microsoft\Teams" /v IsWVDEnvironment /t REG_DWORD /d 1 /f
 
-    $deploy = "C:\Solvinity\Deploy"
-    if (Test-Path $deploy) {
-       
-        Write-Host "Folder Exists"
-        # Perform Delete file from folder operation
-    }
-    else
-    {
-      
-        
-        New-Item $deploy -ItemType Directory
-        Write-Host "Folder Created successfully"
-    }
     
 #Download RDCWEBRTCSvc
 invoke-WebRequest -Uri https://aka.ms/msrdcwebrtcsvc/msi -OutFile "C:\Solvinity\Deploy\MsRdcWebRTCSvc_HostSetup_x64.msi"
@@ -187,3 +202,5 @@ New-NetQosPolicy -Name "RDP Shortpath for managed networks" -AppPathNameMatchCon
 ## Set Time Zone   
 
 Set-TimeZone -Name "W. Europe Standard Time" -PassThru
+
+Stop-Transcript
