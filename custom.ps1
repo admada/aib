@@ -17,20 +17,37 @@ Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://cho
 # {choco install $PackageName -y}
 
 ## Install WinGet
-$URL = "https://api.github.com/repos/microsoft/winget-cli/releases/latest"
-$URL = (Invoke-WebRequest -Uri $URL).Content | ConvertFrom-Json |
-        Select-Object -ExpandProperty "assets" |
-        Where-Object "browser_download_url" -Match '.msixbundle' |
-        Select-Object -ExpandProperty "browser_download_url"
+If ($PSVersionTable.PSVersion -ge [version]"5.0" -and (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full\').Release -ge 379893) {
 
-# download
-Invoke-WebRequest -Uri $URL -OutFile "Setup.msix" -UseBasicParsing
+    If ([Net.ServicePointManager]::SecurityProtocol -ne [Net.SecurityProtocolType]::SystemDefault) {
+         Try { [Net.ServicePointManager]::SecurityProtocol = @([Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12)}
+         Catch { Exit }
+    }
 
-# install
-Add-AppxPackage -Path "Setup.msix"
+    If ((Get-PackageProvider).Name -notcontains "NuGet") {
+        Try { Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction Stop }
+        Catch { Exit }
+    }
+    $ArrPSRepos = Get-PSRepository
+    If ($ArrPSRepos.Name -notcontains "PSGallery") {
+        Try { Register-PSRepository -Default -InstallationPolicy Trusted -ErrorAction Stop }
+        Catch { Exit }
+    } ElseIf ($ArrPSRepos | ?{$_.Name -eq "PSGallery" -and $_.InstallationPolicy -ne "Trusted"}) {
+        Try { Set-PSRepository PSGallery -InstallationPolicy Trusted -ErrorAction Stop }
+        Catch { Exit }
+    }
+    If ((Get-Module -ListAvailable).Name -notcontains "PSReadLine") {
+        Try { Install-Module PSReadLine -Force -ErrorAction Stop }
+        Catch { Exit }
+    }
 
-# delete file
-Remove-Item "Setup.msix"
+}
+
+
+Install-Module -Name WingetTools
+Install-WinGet
+
+winget upgrade --all --silent --accept-package-agreements --accept-source-agreements --force
 
 ## End installation WinGet
 
