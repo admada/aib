@@ -205,5 +205,3 @@ New-NetQosPolicy -Name "RDP Shortpath for managed networks" -AppPathNameMatchCon
 Set-TimeZone -Name "W. Europe Standard Time" -PassThru
 
 Stop-Transcript
-
-Restart-Computer
