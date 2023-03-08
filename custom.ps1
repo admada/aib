@@ -31,8 +31,8 @@ else
     Write-Host "" $deploy " Folder Created successfully"
 }
 
-$PackageName	= "ImageBuilder"
-Start-Transcript -Path "C:\Solvinity\Logs\$($PackageName)_Install.log" -Append
+#$PackageName	= "ImageBuilder"
+# Start-Transcript -Path "C:\Solvinity\Logs\$($PackageName)_Install.log" -Append
 
 
 #Create temp folder
@@ -204,4 +204,4 @@ New-NetQosPolicy -Name "RDP Shortpath for managed networks" -AppPathNameMatchCon
 
 Set-TimeZone -Name "W. Europe Standard Time" -PassThru
 
-Stop-Transcript
+#Stop-Transcript
