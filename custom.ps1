@@ -63,7 +63,7 @@ New-Item -Path 'C:\Temp' -ItemType Directory -Force | Out-Null
 #          Exit}
 # }
 
-Set-ExecutionPolicy RemoteSigned
+#Set-ExecutionPolicy RemoteSigned
 $MyLink = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
 
 Write-Host "Winget is being downloaded"
