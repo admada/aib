@@ -11,9 +11,10 @@
 # Install Software via WinGet
 #-------------------------------------------------
 
-$WinGetApps = 'Google.Chrome',
+$WinGetApps = 'Google.Chrome.Beta',
               'Adobe.Acrobat.Reader.64-bit',
-              'DominikReichl.KeePass' 
+              'DominikReichl.KeePass',
+		          'Mozilla.Firefox'
 
 ###################################################              
 
@@ -52,15 +53,15 @@ New-Item -Path 'C:\Temp' -ItemType Directory -Force | Out-Null
 # {choco install $PackageName -y}
 
 ## Install WinGet
-If ((Get-PackageProvider -Name NuGet).version -lt 2.8.5.201){
-    Try {
-         Write-Host "Installing NuGet."
-         Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Confirm:$false -Scope CurrentUser }
+# If ((Get-PackageProvider -Name NuGet).version -lt 2.8.5.201){
+#     Try {
+#          Write-Host "Installing NuGet."
+#          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Confirm:$false -Scope CurrentUser }
 
-    Catch [Exception]{
-         $_.message
-         Exit}
-}
+#     Catch [Exception]{
+#          $_.message
+#          Exit}
+# }
 
 Set-ExecutionPolicy RemoteSigned
 $MyLink = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
@@ -87,7 +88,7 @@ DISM.EXE /Online /Add-ProvisionedAppxPackage /PackagePath:$localPackage /SkipLic
               
               
 ForEach ($Apps in $WinGetApps)
-{ & $winget_exe install $Apps --silent --accept-package-agreements --accept-source-agreements --scope=machine 
+{ & $winget_exe install --exact --id $Apps --silent --accept-package-agreements --accept-source-agreements --scope=machine --force
    Write-Host "" $Apps " Installed"
 }
 
@@ -204,3 +205,5 @@ New-NetQosPolicy -Name "RDP Shortpath for managed networks" -AppPathNameMatchCon
 Set-TimeZone -Name "W. Europe Standard Time" -PassThru
 
 Stop-Transcript
+
+Restart-Computer
