@@ -38,32 +38,6 @@ else
 #Create temp folder
 New-Item -Path 'C:\Temp' -ItemType Directory -Force | Out-Null
 
-#Install Chocolatey
-# Set-ExecutionPolicy Bypass -Scope Process -Force
-# [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
-# Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-
-#Assign Packages to Install
-# $Packages = 'googlechrome',`
-#             'adobereader',
-#             'keepass'
-
-# #Install choco Packages
-# ForEach ($PackageName in $Packages)
-# {choco install $PackageName -y}
-
-## Install WinGet
-# If ((Get-PackageProvider -Name NuGet).version -lt 2.8.5.201){
-#     Try {
-#          Write-Host "Installing NuGet."
-#          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Confirm:$false -Scope CurrentUser }
-
-#     Catch [Exception]{
-#          $_.message
-#          Exit}
-# }
-
-#Set-ExecutionPolicy RemoteSigned
 $MyLink = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
 
 Write-Host "Winget is being downloaded"
@@ -203,5 +177,9 @@ New-NetQosPolicy -Name "RDP Shortpath for managed networks" -AppPathNameMatchCon
 ## Set Time Zone   
 
 Set-TimeZone -Name "W. Europe Standard Time" -PassThru
+
+Write-Host "Cleaning up temp files. . . . . "
+
+Remove-Item 'C:\Solvinity\Deploy' -Recurse -Force
 
 #Stop-Transcript
