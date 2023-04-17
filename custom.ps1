@@ -1,11 +1,12 @@
 #----------------------------
 # ImageBuilder Deploy script
 # Version: v1.0
-# Date: 07-03-2023
+# Date: 17-04-2023
 # Owner: Andreas Daalder
 # Modifyed By:
 # Modify date: xx-xx-xxxx
 #----------------------------
+
 
 #-------------------------------------------------
 # Install Software via WinGet
@@ -31,13 +32,17 @@ else
     Write-Host "" $deploy " Folder Created successfully"
 }
 
-#$PackageName	= "ImageBuilder"
-# Start-Transcript -Path "C:\Solvinity\Logs\$($PackageName)_Install.log" -Append
+
+Start-Transcript -Path "C:\Solvinity\Logs\"+ (get-date -format 'ddMMyyyy') + '_Install.log' -Append
 
 
 #Create temp folder
 New-Item -Path 'C:\Temp' -ItemType Directory -Force | Out-Null
 
+
+## Install WinGet
+
+#Set-ExecutionPolicy RemoteSigned
 $MyLink = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
 
 Write-Host "Winget is being downloaded"
@@ -63,7 +68,7 @@ DISM.EXE /Online /Add-ProvisionedAppxPackage /PackagePath:$localPackage /SkipLic
               
 ForEach ($Apps in $WinGetApps)
 { & $winget_exe install --exact --id $Apps --silent --accept-package-agreements --accept-source-agreements --scope=machine --force
-   Write-Host "" $Apps " Installed"
+    Write-Host "" $Apps " Installed"
 }
 
 
@@ -91,7 +96,6 @@ Start-Sleep -s 30
 # Variables
 $verbosePreference = 'Continue'
 $vdot = 'https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool/archive/refs/heads/main.zip' 
-#$vdot = 'https://github.com/admada/aib/raw/main/Virtual-Desktop-Optimization-Tool-main.zip' 
 $apppackages = 'https://github.com/admada/aib/raw/main/AppxPackages.json'
 $vdot_location = 'c:\Optimize' 
 $vdot_location_zip = 'c:\Optimize\vdot.zip'
@@ -172,7 +176,15 @@ if(Test-Path $WinstationsKey){
 New-NetFirewallRule -DisplayName 'Remote Desktop - Shortpath (UDP-In)'  -Action Allow -Description 'Inbound rule for the Remote Desktop service to allow RDP traffic. [UDP 3390]' -Group '@FirewallAPI.dll,-28752' -Name 'RemoteDesktop-UserMode-In-Shortpath-UDP'  -PolicyStore PersistentStore -Profile Domain, Private -Service TermService -Protocol udp -LocalPort 3390 -Program '%SystemRoot%\system32\svchost.exe' -Enabled:True
 New-NetQosPolicy -Name "RDP Shortpath for managed networks" -AppPathNameMatchCondition "svchost.exe" -IPProtocolMatchCondition UDP -IPSrcPortStartMatchCondition 3390 -IPSrcPortEndMatchCondition 3390 -DSCPAction 46 -NetworkProfile All
 
-
+#Sysprep fix, remove delay Windows installer
+try {
+    ((Get-Content -path C:\DeprovisioningScript.ps1 -Raw) -replace 'Sysprep.exe /oobe /generalize /quiet /quit', 'Sysprep.exe /oobe /generalize /quit /mode:vm' ) | Set-Content -Path C:\DeprovisioningScript.ps1
+    Write-Host "Sysprep Mode:VM fix applied"
+}
+catch {
+    $ErrorMessage = $_.Exception.message
+    Write-Host "Error updating script: $ErrorMessage"
+}
 
 ## Set Time Zone   
 
@@ -180,6 +192,6 @@ Set-TimeZone -Name "W. Europe Standard Time" -PassThru
 
 Write-Host "Cleaning up temp files. . . . . "
 
-Remove-Item 'C:\Solvinity\Deploy' -Recurse -Force
+Remove-Item $deploy -Recurse -Force
 
-#Stop-Transcript
+Stop-Transcript
