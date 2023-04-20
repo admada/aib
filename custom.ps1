@@ -18,8 +18,9 @@ $WinGetApps = 'Google.Chrome.Beta',
 		          'Mozilla.Firefox'
 
 ###################################################              
-
+$logs   = "C:\Solvinity\Logs"
 $deploy = "C:\Solvinity\Deploy"
+
 if (Test-Path $deploy) {
    
     Write-Host "" $deploy " Folder Exists"
@@ -32,6 +33,17 @@ else
     Write-Host "" $deploy " Folder Created successfully"
 }
 
+if (Test-Path $logs) {
+   
+    Write-Host "" $logs " Folder Exists"
+ 
+}
+else
+{
+      
+    New-Item $logs -ItemType Directory
+    Write-Host "" $logs " Folder Created successfully"
+}
 
 Start-Transcript -Path "C:\Solvinity\Logs\"+ (get-date -format 'ddMMyyyy') + '_Install.log' -Append
 
