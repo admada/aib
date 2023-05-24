@@ -45,7 +45,7 @@ else
     Write-Host "" $logs " Folder Created successfully"
 }
 
-Start-Transcript -Path "C:\Solvinity\Logs\"+ (get-date -format 'ddMMyyyy') + '_Install.log' -Append
+Start-Transcript -Path "C:\Solvinity\Logs\ImageBuilder_Install.log" -Append
 
 
 #Create temp folder
