@@ -103,19 +103,15 @@ Start-Sleep -s 60
 msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt ALLUSER=1 /qn
 Start-Sleep -s 30
 
-#################################
 
 #######################################
 #     Install FSLogix                 #
 #######################################
 
-
-######################
-#    WVD Variables   #
-######################
+$FSLogixInstaller        = "https://aka.ms/fslogix_download"  
 $LocalAVDpath            = "C:\Solvinity\Deploy\"
 $FSInstaller             = 'FSLogixAppsSetup.zip'
-$templateFilePathFolder = "C:\AVDImage"
+$templateFilePathFolder  = "C:\AVDImage"
 
 
 #################################
@@ -194,82 +190,16 @@ if ((Test-Path -Path $templateFilePathFolder -ErrorAction SilentlyContinue)) {
 #  END FSLOGIX    #
 ###################
 
+
 ######## Host Optimalization ##
+$scripturl_vdot = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/WindowsOptimization.ps1'
+$scripturl_appx = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/RemoveAppxPackages.ps1'
 
-$optimize_script = Invoke-WebRequest 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/WindowsOptimization.ps1'
-$ScriptBlock = [Scriptblock]::Create($optimize_script.Content)
-Invoke-Command -ScriptBlock $ScriptBlock -Optimizations "WindowsMediaPlayer","ScheduledTasks","DefaultUserSettings","Autologgers","Services","NetworkOptimizations","LGPO","DiskCleanup","Edge","RemoveLegacyIE"
+$optimize_script = Invoke-WebRequest -uri $scripturl_vdot -OutFile 'C:\Solvinity\Deploy\vdot.ps1'
+$optimize = & "C:\Solvinity\Deploy\vdot.ps1" -Optimizations "WindowsMediaPlayer","ScheduledTasks","DefaultUserSettings","Autologgers","Services","NetworkOptimizations","LGPO","DiskCleanup","Edge","RemoveLegacyIE"
 
-$appx_script = Invoke-WebRequest 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/RemoveAppxPackages.ps1'
-$ScriptBlock2 = [Scriptblock2]::Create($appx_script.Content)
-Invoke-Command -ScriptBlock2 $ScriptBlock2 -AppxPackages "Microsoft.BingNews","Microsoft.BingWeather","Microsoft.GamingApp","Microsoft.GetHelp","Microsoft.Getstarted","Microsoft.MicrosoftOfficeHub","Microsoft.MicrosoftSolitaireCollection","Microsoft.People","Microsoft.PowerAutomateDesktop","Microsoft.ScreenSketch","Microsoft.SkypeApp","Microsoft.Todos","Microsoft.WindowsAlarms","Microsoft.WindowsCamera","Microsoft.windowscommunicationsapps","Microsoft.WindowsFeedbackHub","Microsoft.WindowsMaps","Microsoft.WindowsSoundRecorder","Microsoft.WindowsTerminal","Microsoft.Xbox.TCUI","Microsoft.XboxGameOverlay","Microsoft.XboxGamingOverlay","Microsoft.XboxIdentityProvider","Microsoft.XboxSpeechToTextOverlay","Microsoft.YourPhone","Microsoft.ZuneMusic","Microsoft.ZuneVideo","Microsoft.XboxApp","Microsoft.Windowsstore"
-
-# # Variables
-# $verbosePreference = 'Continue'
-# $vdot = 'https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool/archive/refs/heads/main.zip' 
-# $apppackages = 'https://github.com/admada/aib/raw/main/AppxPackages.json'
-# $vdot_location = 'c:\Optimize' 
-# $vdot_location_zip = 'c:\Optimize\vdot.zip'
-# $apppackages_location = 'C:\Optimize\AppxPackages.json'
-
-# # Enable TLS 1.2
-# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-# # Clear screen
-# Clear
-
-# # Create Folder
-# $checkdir = Test-Path -Path $vdot_location
-# if ($checkdir -eq $false){
-#     Write-Verbose "Creating '$vdot_location' folder"
-#     New-Item -Path 'c:\' -Name 'Optimize' -ItemType 'directory' | Out-Null
-# }
-# else {
-#     Write-Verbose "Folder '$vdot_location' already exists."
-# }
-
-# # Download VDOT
-# Write-Verbose "Download VDOT" 
-# Invoke-WebRequest -Uri $vdot -OutFile $vdot_location_zip
-
-# # Expand Archive
-# Write-Verbose "Expand Archive" 
-# Expand-Archive $vdot_location_zip -DestinationPath $vdot_location -Verbose -Force
-
-# # Remove Archive
-# Write-Verbose "Remove Archive" 
-# Remove-Item $vdot_location_zip
-
-# # Download AppPackages
-# Write-Verbose "Download Apppackages.json APPX file" 
-# Invoke-WebRequest -Uri $apppackages -OutFile $apppackages_location
-
-# # Copy the AppPackage file to all versions
-# Write-Verbose "Copy Apppackages.json to all configurationfiles folders" 
-# Copy-Item $apppackages_location -Destination 'C:\Optimize\Virtual-Desktop-Optimization-Tool-main\1909\ConfigurationFiles\AppxPackages.json'
-# Copy-Item $apppackages_location -Destination 'C:\Optimize\Virtual-Desktop-Optimization-Tool-main\2004\ConfigurationFiles\AppxPackages.json'
-# Copy-Item $apppackages_location -Destination 'C:\Optimize\Virtual-Desktop-Optimization-Tool-main\2009\ConfigurationFiles\AppxPackages.json'
-
-# # Unblock all files
-# Write-Verbose "Unblock all files" 
-# dir $vdot_location -Recurse | Unblock-File
-
-# # Change folder to VDOT
-# Write-Verbose "Change folder to VDOT location" 
-# $vdot_folder = $vdot_location + '\Virtual-Desktop-Optimization-Tool-main' 
-# cd $vdot_folder
-
-# Write-Verbose "Run VDOT" 
-# Set-ExecutionPolicy -ExecutionPolicy bypass -Scope Process -Force
-# ./Windows_VDOT.ps1 -Optimizations All -AdvancedOptimizations All -Verbose -AcceptEULA 
-
-# # Sleep 5 seconds
-# sleep 5
-
-# # Remove folder
-# Write-Verbose "Remove Optimize folder" 
-# cd \
-# Remove-Item $vdot_location -Recurse -Force
+$appx_script = Invoke-WebRequest -uri $scripturl_appx -OutFile 'C:\Solvinity\Deploy\remove_appx.ps1'
+$remove = & "C:\Solvinity\Deploy\remove_appx.ps1" -AppxPackages "Microsoft.BingNews","Microsoft.BingWeather","Microsoft.GamingApp","Microsoft.GetHelp","Microsoft.Getstarted","Microsoft.MicrosoftOfficeHub","Microsoft.MicrosoftSolitaireCollection","Microsoft.People","Microsoft.PowerAutomateDesktop","Microsoft.ScreenSketch","Microsoft.SkypeApp","Microsoft.Todos","Microsoft.WindowsAlarms","Microsoft.WindowsCamera","Microsoft.windowscommunicationsapps","Microsoft.WindowsFeedbackHub","Microsoft.WindowsMaps","Microsoft.WindowsSoundRecorder","Microsoft.WindowsTerminal","Microsoft.Xbox.TCUI","Microsoft.XboxGameOverlay","Microsoft.XboxGamingOverlay","Microsoft.XboxIdentityProvider","Microsoft.XboxSpeechToTextOverlay","Microsoft.YourPhone","Microsoft.ZuneMusic","Microsoft.ZuneVideo","Microsoft.XboxApp","Microsoft.Windowsstore"
 
 
 ## Enable RDP Shortpath
