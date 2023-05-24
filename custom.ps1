@@ -45,7 +45,7 @@ else
     Write-Host "" $logs " Folder Created successfully"
 }
 
-Start-Transcript -Path "C:\Solvinity\Logs\ImageBuilder_Install.log" -Append
+Start-Transcript -Path "C:\Solvinity\Logs\"+ (get-date -format 'ddMMyyyy') + '_Install.log' -Append
 
 
 #Create temp folder
@@ -103,74 +103,173 @@ Start-Sleep -s 60
 msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt ALLUSER=1 /qn
 Start-Sleep -s 30
 
+#################################
+
+#######################################
+#     Install FSLogix                 #
+#######################################
+
+
+######################
+#    WVD Variables   #
+######################
+$LocalAVDpath            = "C:\Solvinity\Deploy\"
+$FSInstaller             = 'FSLogixAppsSetup.zip'
+$templateFilePathFolder = "C:\AVDImage"
+
+
+#################################
+#    Download FSLogix           #
+#################################
+Write-Host "AVD AIB Customization - Install FSLogix : Downloading FSLogix from URI: $FSLogixInstaller"
+Invoke-WebRequest -Uri $FSLogixInstaller -OutFile "$LocalAVDpath$FSInstaller"
+
+
+##############################
+#  Prep for FSLogix Install  #
+##############################
+Write-Host "AVD AIB Customization - Install FSLogix : Unzipping FSLogix installer"
+Expand-Archive `
+    -LiteralPath "C:\Solvinity\Deploy\$FSInstaller" `
+    -DestinationPath "$LocalAVDpath\FSLogix" `
+    -Force `
+    -Verbose
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Set-Location $LocalAVDpath 
+Write-Host "AVD AIB Customization - Install FSLogix : UnZip of FSLogix complete"
+
+
+#########################
+#    FSLogix Install    #
+#########################
+Write-Host "AVD AIB Customization - Install FSLogix : Starting to install FSLogix"
+$fslogix_deploy_status = Start-Process `
+    -FilePath "$LocalAVDpath\FSLogix\x64\Release\FSLogixAppsSetup.exe" `
+    -ArgumentList "/install /quiet /norestart" `
+    -Wait `
+    -Passthru
+
+#Reference: https://learn.microsoft.com/en-us/azure/architecture/example-scenario/wvd/windows-virtual-desktop-fslogix#add-exclusions-for-microsoft-defender-for-cloud-by-using-powershell
+Write-Host "AVD AIB Customization - Install FSLogix : Adding exclusions for Microsoft Defender"
+
+try {
+     $filelist = `
+  "%ProgramFiles%\FSLogix\Apps\frxdrv.sys", `
+  "%ProgramFiles%\FSLogix\Apps\frxdrvvt.sys", `
+  "%ProgramFiles%\FSLogix\Apps\frxccd.sys", `
+  "%TEMP%\*.VHD", `
+  "%TEMP%\*.VHDX", `
+  "%Windir%\TEMP\*.VHD", `
+  "%Windir%\TEMP\*.VHDX" `
+
+    $processlist = `
+    "%ProgramFiles%\FSLogix\Apps\frxccd.exe", `
+    "%ProgramFiles%\FSLogix\Apps\frxccds.exe", `
+    "%ProgramFiles%\FSLogix\Apps\frxsvc.exe"
+
+    Foreach($item in $filelist){
+        Add-MpPreference -ExclusionPath $item}
+    Foreach($item in $processlist){
+        Add-MpPreference -ExclusionProcess $item}
+
+
+    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Cache\*.VHD"
+    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Cache\*.VHDX"
+    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Proxy\*.VHD"
+    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Proxy\*.VHDX"
+}
+catch {
+     Write-Host "AVD AIB Customization - Install FSLogix : Exception occurred while adding exclusions for Microsoft Defender"
+     Write-Host $PSItem.Exception
+}
+
+Write-Host "AVD AIB Customization - Install FSLogix : Finished adding exclusions for Microsoft Defender"
+
+#Cleanup
+if ((Test-Path -Path $templateFilePathFolder -ErrorAction SilentlyContinue)) {
+    Remove-Item -Path $templateFilePathFolder -Force -Recurse -ErrorAction Continue
+}
+
+###################
+#  END FSLOGIX    #
+###################
+
 ######## Host Optimalization ##
 
-# Variables
-$verbosePreference = 'Continue'
-$vdot = 'https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool/archive/refs/heads/main.zip' 
-$apppackages = 'https://github.com/admada/aib/raw/main/AppxPackages.json'
-$vdot_location = 'c:\Optimize' 
-$vdot_location_zip = 'c:\Optimize\vdot.zip'
-$apppackages_location = 'C:\Optimize\AppxPackages.json'
+$optimize_script = Invoke-WebRequest 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/WindowsOptimization.ps1'
+$ScriptBlock = [Scriptblock]::Create($optimize_script.Content)
+Invoke-Command -ScriptBlock $ScriptBlock -Optimizations "WindowsMediaPlayer","ScheduledTasks","DefaultUserSettings","Autologgers","Services","NetworkOptimizations","LGPO","DiskCleanup","Edge","RemoveLegacyIE"
 
-# Enable TLS 1.2
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$appx_script = Invoke-WebRequest 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/RemoveAppxPackages.ps1'
+$ScriptBlock2 = [Scriptblock2]::Create($appx_script.Content)
+Invoke-Command -ScriptBlock2 $ScriptBlock2 -AppxPackages "Microsoft.BingNews","Microsoft.BingWeather","Microsoft.GamingApp","Microsoft.GetHelp","Microsoft.Getstarted","Microsoft.MicrosoftOfficeHub","Microsoft.MicrosoftSolitaireCollection","Microsoft.People","Microsoft.PowerAutomateDesktop","Microsoft.ScreenSketch","Microsoft.SkypeApp","Microsoft.Todos","Microsoft.WindowsAlarms","Microsoft.WindowsCamera","Microsoft.windowscommunicationsapps","Microsoft.WindowsFeedbackHub","Microsoft.WindowsMaps","Microsoft.WindowsSoundRecorder","Microsoft.WindowsTerminal","Microsoft.Xbox.TCUI","Microsoft.XboxGameOverlay","Microsoft.XboxGamingOverlay","Microsoft.XboxIdentityProvider","Microsoft.XboxSpeechToTextOverlay","Microsoft.YourPhone","Microsoft.ZuneMusic","Microsoft.ZuneVideo","Microsoft.XboxApp","Microsoft.Windowsstore"
 
-# Clear screen
-Clear
+# # Variables
+# $verbosePreference = 'Continue'
+# $vdot = 'https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool/archive/refs/heads/main.zip' 
+# $apppackages = 'https://github.com/admada/aib/raw/main/AppxPackages.json'
+# $vdot_location = 'c:\Optimize' 
+# $vdot_location_zip = 'c:\Optimize\vdot.zip'
+# $apppackages_location = 'C:\Optimize\AppxPackages.json'
 
-# Create Folder
-$checkdir = Test-Path -Path $vdot_location
-if ($checkdir -eq $false){
-    Write-Verbose "Creating '$vdot_location' folder"
-    New-Item -Path 'c:\' -Name 'Optimize' -ItemType 'directory' | Out-Null
-}
-else {
-    Write-Verbose "Folder '$vdot_location' already exists."
-}
+# # Enable TLS 1.2
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# Download VDOT
-Write-Verbose "Download VDOT" 
-Invoke-WebRequest -Uri $vdot -OutFile $vdot_location_zip
+# # Clear screen
+# Clear
 
-# Expand Archive
-Write-Verbose "Expand Archive" 
-Expand-Archive $vdot_location_zip -DestinationPath $vdot_location -Verbose -Force
+# # Create Folder
+# $checkdir = Test-Path -Path $vdot_location
+# if ($checkdir -eq $false){
+#     Write-Verbose "Creating '$vdot_location' folder"
+#     New-Item -Path 'c:\' -Name 'Optimize' -ItemType 'directory' | Out-Null
+# }
+# else {
+#     Write-Verbose "Folder '$vdot_location' already exists."
+# }
 
-# Remove Archive
-Write-Verbose "Remove Archive" 
-Remove-Item $vdot_location_zip
+# # Download VDOT
+# Write-Verbose "Download VDOT" 
+# Invoke-WebRequest -Uri $vdot -OutFile $vdot_location_zip
 
-# Download AppPackages
-Write-Verbose "Download Apppackages.json APPX file" 
-Invoke-WebRequest -Uri $apppackages -OutFile $apppackages_location
+# # Expand Archive
+# Write-Verbose "Expand Archive" 
+# Expand-Archive $vdot_location_zip -DestinationPath $vdot_location -Verbose -Force
 
-# Copy the AppPackage file to all versions
-Write-Verbose "Copy Apppackages.json to all configurationfiles folders" 
-Copy-Item $apppackages_location -Destination 'C:\Optimize\Virtual-Desktop-Optimization-Tool-main\1909\ConfigurationFiles\AppxPackages.json'
-Copy-Item $apppackages_location -Destination 'C:\Optimize\Virtual-Desktop-Optimization-Tool-main\2004\ConfigurationFiles\AppxPackages.json'
-Copy-Item $apppackages_location -Destination 'C:\Optimize\Virtual-Desktop-Optimization-Tool-main\2009\ConfigurationFiles\AppxPackages.json'
+# # Remove Archive
+# Write-Verbose "Remove Archive" 
+# Remove-Item $vdot_location_zip
 
-# Unblock all files
-Write-Verbose "Unblock all files" 
-dir $vdot_location -Recurse | Unblock-File
+# # Download AppPackages
+# Write-Verbose "Download Apppackages.json APPX file" 
+# Invoke-WebRequest -Uri $apppackages -OutFile $apppackages_location
 
-# Change folder to VDOT
-Write-Verbose "Change folder to VDOT location" 
-$vdot_folder = $vdot_location + '\Virtual-Desktop-Optimization-Tool-main' 
-cd $vdot_folder
+# # Copy the AppPackage file to all versions
+# Write-Verbose "Copy Apppackages.json to all configurationfiles folders" 
+# Copy-Item $apppackages_location -Destination 'C:\Optimize\Virtual-Desktop-Optimization-Tool-main\1909\ConfigurationFiles\AppxPackages.json'
+# Copy-Item $apppackages_location -Destination 'C:\Optimize\Virtual-Desktop-Optimization-Tool-main\2004\ConfigurationFiles\AppxPackages.json'
+# Copy-Item $apppackages_location -Destination 'C:\Optimize\Virtual-Desktop-Optimization-Tool-main\2009\ConfigurationFiles\AppxPackages.json'
 
-Write-Verbose "Run VDOT" 
-Set-ExecutionPolicy -ExecutionPolicy bypass -Scope Process -Force
-./Windows_VDOT.ps1 -Optimizations All -AdvancedOptimizations All -Verbose -AcceptEULA 
+# # Unblock all files
+# Write-Verbose "Unblock all files" 
+# dir $vdot_location -Recurse | Unblock-File
 
-# Sleep 5 seconds
-sleep 5
+# # Change folder to VDOT
+# Write-Verbose "Change folder to VDOT location" 
+# $vdot_folder = $vdot_location + '\Virtual-Desktop-Optimization-Tool-main' 
+# cd $vdot_folder
 
-# Remove folder
-Write-Verbose "Remove Optimize folder" 
-cd \
-Remove-Item $vdot_location -Recurse -Force
+# Write-Verbose "Run VDOT" 
+# Set-ExecutionPolicy -ExecutionPolicy bypass -Scope Process -Force
+# ./Windows_VDOT.ps1 -Optimizations All -AdvancedOptimizations All -Verbose -AcceptEULA 
+
+# # Sleep 5 seconds
+# sleep 5
+
+# # Remove folder
+# Write-Verbose "Remove Optimize folder" 
+# cd \
+# Remove-Item $vdot_location -Recurse -Force
 
 
 ## Enable RDP Shortpath
@@ -197,6 +296,11 @@ catch {
     $ErrorMessage = $_.Exception.message
     Write-Host "Error updating script: $ErrorMessage"
 }
+
+## Set Time Zone   
+
+Set-TimeZone -Name "W. Europe Standard Time" -PassThru
+
 #######################################
 #    Disable Storage Sense            #
 #######################################
@@ -235,12 +339,14 @@ function Set-RegKey($registryPath, $registryKey, $registryValue) {
          Write-Host "*** AVD AIB CUSTOMIZER PHASE ***   Disable Storage Sense  - Cannot add the registry key  $registryKey *** : [$($_.Exception.Message)]"
     }
  }
-## Set Time Zone   
 
-Set-TimeZone -Name "W. Europe Standard Time" -PassThru
+
 
 Write-Host "Cleaning up temp files. . . . . "
 
-Remove-Item $deploy -Recurse -Force
+if ((Test-Path -Path $deploy -ErrorAction SilentlyContinue)) {
+    Remove-Item -Path $deploy -Force -Recurse -ErrorAction Continue
+}
+
 
 Stop-Transcript
