@@ -202,9 +202,9 @@ $languagep_script    = Invoke-WebRequest -uri $scripturl_lp -OutFile 'C:\Solvini
 $lp = & "C:\Solvinity\Deploy\installLanguagePacks.ps1" -LanguageList "Dutch (Netherlands)"
 
 ####### Set default Language ########
-$scripturl_dl      = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/setDefaultLanguage.ps1'
+$scripturl_dl      = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/SetDefaultLang.ps1'
 $dlanguage_script    = Invoke-WebRequest -uri $scripturl_dl -OutFile 'C:\Solvinity\Deploy\setDefaultLanguage.ps1'
-$dl = & "C:\Solvinity\Deploy\setDefaultLanguage.ps1" -Language "Dutch (Netherlands)" -TimeZoneID "W. Europe Standard Time"
+$dl = & "C:\Solvinity\Deploy\setDefaultLanguage.ps1" -Language "Dutch (Netherlands)" 
 
 
 ######## Host Optimalization #########
