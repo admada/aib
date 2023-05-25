@@ -192,12 +192,12 @@ if ((Test-Path -Path $templateFilePathFolder -ErrorAction SilentlyContinue)) {
 ###################
 
 ####### Multi media redirection ########
-$scripturl_mmr = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/multiMediaRedirection.ps1'
+$scripturl_mmr = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/MultiMediaRedirection.ps1'
 $mmr_script    = Invoke-WebRequest -uri $scripturl_mmr -OutFile 'C:\Solvinity\Deploy\mmr.ps1'
 $mmr = & "C:\Solvinity\Deploy\mmr.ps1" -VCRedistributableLink "https://aka.ms/vs/17/release/vc_redist.x64.exe" -EnableEdge "true" -EnableChrome "true"
 
 ####### Language Packs ########
-$scripturl_lp      = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/installLanguagePacks.ps1'
+$scripturl_lp      = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/InstallLanguagePacks.ps1'
 $languagep_script    = Invoke-WebRequest -uri $scripturl_lp -OutFile 'C:\Solvinity\Deploy\installLanguagePacks.ps1'
 $lp = & "C:\Solvinity\Deploy\installLanguagePacks.ps1" -LanguageList "Dutch (Netherlands)"
 
