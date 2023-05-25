@@ -1,7 +1,7 @@
 #----------------------------
 # ImageBuilder Deploy script
 # Version: v1.0
-# Date: 17-04-2023
+# Date: 25-05-2023
 # Owner: Andreas Daalder
 # Modifyed By:
 # Modify date: xx-xx-xxxx
@@ -104,6 +104,7 @@ msiexec /i "C:\Solvinity\Deploy\Teams_windows_x64.msi" /l*v teamsinstall.txt ALL
 Start-Sleep -s 30
 
 
+
 #######################################
 #     Install FSLogix                 #
 #######################################
@@ -190,8 +191,23 @@ if ((Test-Path -Path $templateFilePathFolder -ErrorAction SilentlyContinue)) {
 #  END FSLOGIX    #
 ###################
 
+####### Multi media redirection ########
+$scripturl_mmr = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/multiMediaRedirection.ps1'
+$mmr_script    = Invoke-WebRequest -uri $scripturl_mmr -OutFile 'C:\Solvinity\Deploy\mmr.ps1'
+$mmr = & "C:\Solvinity\Deploy\mmr.ps1" -VCRedistributableLink "https://aka.ms/vs/17/release/vc_redist.x64.exe" -EnableEdge "true" -EnableChrome "true"
 
-######## Host Optimalization ##
+####### Language Packs ########
+$scripturl_lp      = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/installLanguagePacks.ps1'
+$languagep_script    = Invoke-WebRequest -uri $scripturl_lp -OutFile 'C:\Solvinity\Deploy\installLanguagePacks.ps1'
+$lp = & "C:\Solvinity\Deploy\installLanguagePacks.ps1" -LanguageList "Dutch (Netherlands)"
+
+####### Set default Language ########
+$scripturl_dl      = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/setDefaultLanguage.ps1'
+$dlanguage_script    = Invoke-WebRequest -uri $scripturl_dl -OutFile 'C:\Solvinity\Deploy\setDefaultLanguage.ps1'
+$dl = & "C:\Solvinity\Deploy\setDefaultLanguage.ps1" -Language "Dutch (Netherlands)" -TimeZoneID "W. Europe Standard Time"
+
+
+######## Host Optimalization #########
 $scripturl_vdot = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/WindowsOptimization.ps1'
 $scripturl_appx = 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2023-05-16/RemoveAppxPackages.ps1'
 
