@@ -12,10 +12,11 @@
 # Install Software via WinGet
 #-------------------------------------------------
 
-$WinGetApps = 'Google.Chrome.Beta',
-              'Adobe.Acrobat.Reader.64-bit',
-              'DominikReichl.KeePass',
-		          'Mozilla.Firefox'
+$WinGetApps = @( 
+              "Adobe.Acrobat.Reader.64-bit",
+              "DominikReichl.KeePass",
+	      "Mozilla.Firefox"
+)
 
 ###################################################              
 $logs   = "C:\Solvinity\Logs"
@@ -54,34 +55,28 @@ New-Item -Path 'C:\Temp' -ItemType Directory -Force | Out-Null
 
 ## Install WinGet
 
-#Set-ExecutionPolicy RemoteSigned
-$MyLink = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted
+Install-Script -Name winget-install -Force
+winget-install.ps1 -Force
 
-Write-Host "Winget is being downloaded"
-
-Invoke-WebRequest -Uri $MyLink -OutFile "C:\Solvinity\Deploy\WinGet.msixbundle"
-Write-Host "Winget installer downloaded, launching installer."
-$localFolderPath = "C:\Solvinity\Deploy"
-$localPackage = "C:\Solvinity\Deploy\WinGet.msixbundle"
-
-DISM.EXE /Online /Add-ProvisionedAppxPackage /PackagePath:$localPackage /SkipLicense
-
-## End installation WinGet
-
-## Start installation of Applications
-
- $winget_exe = Resolve-Path "C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe"
-      if ($winget_exe.count -gt 1){
-          $winget_exe = $winget_exe[-1].Path
-              }
-              
-              if (!$winget_exe){Write-Error "Winget not installed"} 
-              
-              
-ForEach ($Apps in $WinGetApps)
-{ & $winget_exe install --exact --id $Apps --silent --accept-package-agreements --accept-source-agreements --scope=machine --force
-    Write-Host "" $Apps " Installed"
+# Function to install a package using winget
+function Install-WingetApp {
+    param (
+        [string]$PackageIdentifier
+    )
+    
+    Write-Host "Attempting to install $PackageIdentifier..."
+    winget install --id $PackageIdentifier --accept-package-agreements --accept-source-agreements
 }
+
+# Install apps
+foreach ($app in $apps) {
+    Install-WingetApp -PackageIdentifier $app
+    Write-Host "Installation process $app."
+}
+
+Write-Host "Installation WinGet process completed."
 
 
 # install Teams in VDI Mode
