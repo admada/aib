@@ -290,9 +290,9 @@ function Set-RegKey($registryPath, $registryKey, $registryValue) {
 
 Write-Host "Cleaning up temp files. . . . . "
 
-if ((Test-Path -Path $deploy -ErrorAction SilentlyContinue)) {
-    Remove-Item -Path $deploy -Force -Recurse -ErrorAction Continue
-}
+# if ((Test-Path -Path $deploy -ErrorAction SilentlyContinue)) {
+#     Remove-Item -Path $deploy -Force -Recurse -ErrorAction Continue
+# }
 
 
 Stop-Transcript
