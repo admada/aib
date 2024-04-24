@@ -71,7 +71,7 @@ function Install-WingetApp {
 }
 
 # Install apps
-foreach ($app in $apps) {
+foreach ($app in $WinGetApps) {
     Install-WingetApp -PackageIdentifier $app
     Write-Host "Installation process $app."
 }
