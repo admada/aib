@@ -67,7 +67,7 @@ function Install-WingetApp {
     )
     
     Write-Host "Attempting to install $PackageIdentifier..."
-    winget install --id $PackageIdentifier --accept-package-agreements --accept-source-agreements
+    winget install --id $PackageIdentifier --silent --accept-source-agreements --accept-package-agreements --scope=machine --force
 }
 
 # Install apps
