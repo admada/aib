@@ -1,6 +1,6 @@
 #----------------------------
 # ImageBuilder Deploy script
-# Version: v1.0
+ $Version = "v1.1"
 # Date: 25-05-2023
 # Owner: Andreas Daalder
 # Modifyed By:
@@ -48,6 +48,7 @@ else
 
 Start-Transcript -Path "C:\Solvinity\Logs\ImageBuilder_Install.log" -Append
 
+Write-Host "Starting AVD AIB Customization Script: $Version"
 
 #Create temp folder
 New-Item -Path 'C:\Temp' -ItemType Directory -Force | Out-Null
