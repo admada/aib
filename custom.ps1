@@ -120,12 +120,12 @@ cd $wingetpath
 }
 
 # Install apps
-foreach ($app in $WinGetApps) {
-    Install-WingetApp -PackageIdentifier $app
-    Write-Host "Installation process $app."
-}
+# foreach ($app in $WinGetApps) {
+#     Install-WingetApp -PackageIdentifier $app
+#     Write-Host "Installation process $app."
+# }
 
-Write-Host "Installation WinGet process completed."
+# Write-Host "Installation WinGet process completed."
 
 
 # install Teams in VDI Mode
