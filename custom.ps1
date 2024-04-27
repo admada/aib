@@ -107,9 +107,16 @@ function Install-WingetApp {
     param (
         [string]$PackageIdentifier
     )
-    
+    $ResolveWingetPath = Resolve-Path "C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe"
+    if ($ResolveWingetPath){
+           $WingetPath = $ResolveWingetPath[-1].Path
+    }
+
+$Wingetpath = Split-Path -Path $WingetPath -Parent
+cd $wingetpath
+
     Write-Host "Attempting to install $PackageIdentifier..."
-    winget install --id $PackageIdentifier --silent --accept-source-agreements --accept-package-agreements --scope=machine --force
+    .\winget install --exact --id $PackageIdentifier --silent --accept-source-agreements --accept-package-agreements 
 }
 
 # Install apps
