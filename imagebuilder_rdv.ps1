@@ -92,14 +92,11 @@ try {
     # Install Language Packs
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/InstallLanguagePacks.ps1" -Destination "$avdPath\installLanguagePacks.ps1"
     Run-AVDScript "C:\AVDImage\installLanguagePacks.ps1 -LanguageList 'Dutch (Netherlands)'"
-    Run-WindowsUpdate
     Run-WindowsRestart -Timeout "10m"
 
     # Set Default Language
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/SetDefaultLang.ps1" -Destination "$avdPath\setDefaultLanguage.ps1"
     Run-AVDScript "C:\AVDImage\setDefaultLanguage.ps1 -Language 'Dutch (Netherlands)'"
-    Run-WindowsUpdate
-    Run-WindowsRestart -Timeout "5m"
 
     # TimeZone Redirection
     Run-AVDScript "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/TimezoneRedirection.ps1' | Invoke-Expression"
@@ -117,14 +114,13 @@ try {
     # Windows Optimization
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/WindowsOptimization.ps1" -Destination "$avdPath\windowsOptimization.ps1"
     Run-AVDScript "C:\AVDImage\windowsOptimization.ps1 -Optimizations 'WindowsMediaPlayer','ScheduledTasks','DefaultUserSettings','Autologgers','Services','NetworkOptimizations','LGPO','DiskCleanup','Edge','RemoveLegacyIE','RemoveOneDrive'"
-    Run-WindowsUpdate
-    Run-WindowsRestart
+
 
     # Remove Appx Packages
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/RemoveAppxPackages.ps1" -Destination "$avdPath\removeAppxPackages.ps1"
     Run-AVDScript "C:\AVDImage\removeAppxPackages.ps1 -AppxPackages 'Microsoft.XboxApp','Microsoft.ZuneVideo','Microsoft.ZuneMusic','Microsoft.YourPhone','Microsoft.XboxSpeechToTextOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxGamingOverlay','Microsoft.XboxGameOverlay','Microsoft.Xbox.TCUI','Microsoft.WindowsTerminal','Microsoft.WindowsSoundRecorder','Microsoft.WindowsMaps','Microsoft.WindowsFeedbackHub','Microsoft.windowscommunicationsapps','Microsoft.WindowsCamera','Microsoft.WindowsCalculator','Microsoft.WindowsAlarms','Microsoft.Windows.Photos','Microsoft.Todos','Microsoft.SkypeApp','Microsoft.ScreenSketch','Microsoft.PowerAutomateDesktop','Microsoft.People','Microsoft.MSPaint','Microsoft.MicrosoftStickyNotes','Microsoft.MicrosoftSolitaireCollection','Microsoft.Office.OneNote','Microsoft.MicrosoftOfficeHub','Microsoft.Getstarted','Microsoft.GamingApp','Microsoft.BingWeather','Microsoft.GetHelp','Microsoft.BingNews','Clipchamp.Clipchamp'"
     Run-WindowsUpdate
-    Run-WindowsRestart
+    Run-WindowsRestart -Timeout "5m"
 }
 finally {
     # Cleanup downloaded helper scripts (logged in transcript)
