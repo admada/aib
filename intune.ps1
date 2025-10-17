@@ -33,6 +33,7 @@ $k = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\MDM"
 if (-not (Test-Path $k)) { New-Item -Path $k -Force | Out-Null }
 Set-ItemProperty -Path $k -Name AutoEnrollMDM -Type DWord -Value 1
 Set-ItemProperty -Path $k -Name UseAADDeviceCredentials -Type DWord -Value 1
+Set-ItemProperty -Path $k -Name UseDeviceCredentials -Type DWord -Value 1
 
 # Add ScheduledTaskTrigger
 $triggers = @()
