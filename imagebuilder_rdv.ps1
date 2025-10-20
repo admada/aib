@@ -1,27 +1,20 @@
-# AVD Image Builder customization script (no-reboot, no PSWindowsUpdate dependency)
-# Compatible with Windows PowerShell 5.1 on AIB/Packer build VMs
+# AVD Image Builder customization script (no reboot, no PSWindowsUpdate dependency)
+# Windows PowerShell 5.1 compatible
 
-#-------------------------------
-# Hard-fail on any error
-#-------------------------------
+# ===== Strict mode & TLS =====
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-#-------------------------------
-# Folders & logging
-#-------------------------------
+# ===== Paths & transcript =====
 $avdPath = 'C:\AVDImage'
 if (-not (Test-Path $avdPath)) {
     New-Item -ItemType Directory -Path $avdPath | Out-Null
 }
 $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-$logFile  = Join-Path $avdPath "imagebuilder_$timestamp.log"
+$logFile  = "$avdPath\imagebuilder_$timestamp.log"
 Start-Transcript -Path $logFile -Append
 
-#-------------------------------
-# Helpers
-#-------------------------------
 function Write-Stage {
     param([Parameter(Mandatory)][string]$Message)
     Write-Host ('-'*80)
@@ -36,12 +29,18 @@ function Download-AVDScript {
     )
     Write-Stage "Downloading: $Uri -> $Destination"
     Invoke-WebRequest -Uri $Uri -OutFile $Destination -UseBasicParsing
+    if (-not (Test-Path -LiteralPath $Destination)) {
+        throw "Download failed: $Destination was not created."
+    }
 }
 
 function Run-AVDScript {
     param([Parameter(Mandatory)][string]$CommandLine)
     Write-Stage "Running: $CommandLine"
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command $CommandLine
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code $LASTEXITCODE : $CommandLine"
+    }
 }
 
 function Enable-IntuneAutoEnroll {
@@ -51,9 +50,9 @@ function Enable-IntuneAutoEnroll {
         if (-not (Test-Path $mdmKey)) { New-Item -Path $mdmKey -Force | Out-Null }
         New-ItemProperty -Path $mdmKey -Name AutoEnrollMDM -Value 1 -PropertyType DWord -Force | Out-Null
         New-ItemProperty -Path $mdmKey -Name UseAADDeviceCredentials -Value 1 -PropertyType DWord -Force | Out-Null
-        New-ItemProperty -Path $mdmKey -Name UseDeviceCredentials -Value 1 -PropertyType DWord -Force | Out-Null
+        New-ItemProperty -Path $mdmKey -Name UseDeviceCredentials     -Value 1 -PropertyType DWord -Force | Out-Null
 
-        # Opportunistically create a scheduled task to kick Device Enroller at first boot
+        # Kick device enroller on first boot
         $action  = New-ScheduledTaskAction -Execute "$env:windir\system32\deviceenroller.exe" -Argument "/c /AutoEnrollMDMUsingAADDeviceCredential"
         $trigger = New-ScheduledTaskTrigger -At (Get-Date).AddMinutes(1) -Once
         Register-ScheduledTask -TaskName "TriggerEnrollment" -User "SYSTEM" -Action $action -Trigger $trigger -RunLevel Highest -Force | Out-Null
@@ -93,8 +92,7 @@ function Set-DefenderExclusions {
 }
 
 function SysprepVmModeFix {
-    # AIB uploads C:\DeprovisioningScript.ps1; make sure it uses VM mode
-    Write-Stage "Patching Sysprep command to use /mode:vm"
+    Write-Stage "Patching Sysprep command in C:\DeprovisioningScript.ps1 to use /mode:vm"
     try {
         $file = 'C:\DeprovisioningScript.ps1'
         if (Test-Path $file) {
@@ -119,9 +117,7 @@ function Cleanup-DownloadedScripts {
     }
 }
 
-#-------------------------------
-# URLs of official AVD helper scripts (Azure RDS repo)
-#-------------------------------
+# ===== Official AVD helper script URLs (Azure RDS repo) =====
 $urls = @{
     InstallLanguagePacks = "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/InstallLanguagePacks.ps1"
     SetDefaultLang       = "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/SetDefaultLang.ps1"
@@ -133,7 +129,7 @@ $urls = @{
     RemoveAppx           = "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/RemoveAppxPackages.ps1"
 }
 
-# Destination paths (avoid the Join-Path array pitfall)
+# ===== Destination paths (strings only; no Join-Path array pitfalls) =====
 $paths = @{
     InstallLanguagePacks = "$avdPath\InstallLanguagePacks.ps1"
     SetDefaultLang       = "$avdPath\SetDefaultLang.ps1"
@@ -145,7 +141,7 @@ $paths = @{
     RemoveAppx           = "$avdPath\RemoveAppxPackages.ps1"
 }
 
-# Keep a list for cleanup later
+# Keep a list for cleanup later (again: plain strings)
 $downloadedHelpers = @(
     $paths.InstallLanguagePacks,
     $paths.SetDefaultLang,
@@ -157,16 +153,13 @@ $downloadedHelpers = @(
     $paths.RemoveAppx
 )
 
-#-------------------------------
-# Main sequence
-#-------------------------------
+# ===== Main sequence =====
 try {
     Write-Stage "Starting AVD image customization"
 
     # 1) Language packs (example: Dutch (Netherlands))
     Download-AVDScript -Uri $urls.InstallLanguagePacks -Destination $paths.InstallLanguagePacks
-    Run-AVDScript "`${env:ProgramFiles}\PowerShell\7\pwsh.exe -NoProfile -File `"$($paths.InstallLanguagePacks)`" -LanguageList 'Dutch (Netherlands)'" 2>$null `
-        ; if ($LASTEXITCODE -ne 0) { Run-AVDScript "`"$($paths.InstallLanguagePacks)`" -LanguageList 'Dutch (Netherlands)'" }
+    Run-AVDScript "`"$($paths.InstallLanguagePacks)`" -LanguageList 'Dutch (Netherlands)'"
 
     # 2) Set default language
     Download-AVDScript -Uri $urls.SetDefaultLang -Destination $paths.SetDefaultLang
@@ -211,7 +204,7 @@ try {
     Enable-IntuneAutoEnroll
 }
 finally {
-    # Ensure sysprep script is patched and helpers cleaned even on failure
+    # Always do these even if a step failed
     SysprepVmModeFix
     Cleanup-DownloadedScripts -Files $downloadedHelpers
     Stop-Transcript
