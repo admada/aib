@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  AVD Image Builder Script (imagebuilder.ps1)
+  AVD Image Builder Script (imagebuilder_rdv.ps1)
 
 #>
 
@@ -79,6 +79,41 @@ $Null = Register-ScheduledTask -TaskName "TriggerEnrollment" -Trigger $triggers 
 
 }
 
+function Set-Defender-Excludes {
+try {
+     $filelist = `
+  "%ProgramFiles%\FSLogix\Apps\frxdrv.sys", `
+  "%ProgramFiles%\FSLogix\Apps\frxdrvvt.sys", `
+  "%ProgramFiles%\FSLogix\Apps\frxccd.sys", `
+  "%TEMP%\*.VHD", `
+  "%TEMP%\*.VHDX", `
+  "%Windir%\TEMP\*.VHD", `
+  "%Windir%\TEMP\*.VHDX" `
+
+    $processlist = `
+    "%ProgramFiles%\FSLogix\Apps\frxccd.exe", `
+    "%ProgramFiles%\FSLogix\Apps\frxccds.exe", `
+    "%ProgramFiles%\FSLogix\Apps\frxsvc.exe"
+
+    Foreach($item in $filelist){
+        Add-MpPreference -ExclusionPath $item}
+    Foreach($item in $processlist){
+        Add-MpPreference -ExclusionProcess $item}
+
+
+    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Cache\*.VHD"
+    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Cache\*.VHDX"
+    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Proxy\*.VHD"
+    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Proxy\*.VHDX"
+}
+catch {
+     Write-Host "AVD AIB Customization - Install FSLogix : Exception occurred while adding exclusions for Microsoft Defender"
+     Write-Host $PSItem.Exception
+}
+
+Write-Host "Finished adding exclusions for Microsoft Defender"
+
+}
 
 function Cleanup-DownloadedScripts {
     param (
@@ -151,7 +186,13 @@ try {
     # Remove Appx Packages
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/RemoveAppxPackages.ps1" -Destination "$avdPath\removeAppxPackages.ps1"
     Run-AVDScript "C:\AVDImage\removeAppxPackages.ps1 -AppxPackages 'Microsoft.XboxApp','Microsoft.ZuneVideo','Microsoft.ZuneMusic','Microsoft.YourPhone','Microsoft.XboxSpeechToTextOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxGamingOverlay','Microsoft.XboxGameOverlay','Microsoft.Xbox.TCUI','Microsoft.WindowsTerminal','Microsoft.WindowsSoundRecorder','Microsoft.WindowsMaps','Microsoft.WindowsFeedbackHub','Microsoft.windowscommunicationsapps','Microsoft.WindowsCamera','Microsoft.WindowsCalculator','Microsoft.WindowsAlarms','Microsoft.Windows.Photos','Microsoft.Todos','Microsoft.SkypeApp','Microsoft.ScreenSketch','Microsoft.PowerAutomateDesktop','Microsoft.People','Microsoft.MSPaint','Microsoft.MicrosoftStickyNotes','Microsoft.MicrosoftSolitaireCollection','Microsoft.Office.OneNote','Microsoft.MicrosoftOfficeHub','Microsoft.Getstarted','Microsoft.GamingApp','Microsoft.BingWeather','Microsoft.GetHelp','Microsoft.BingNews','Clipchamp.Clipchamp'"
+    
+    # Defender Excludes
+    Set-Defender-Excludes
+    
+    # Set Intune settings
     Enable-Intune
+    
     # Run-WindowsUpdate ## Disabled updates
     Run-WindowsRestart -Timeout "5m"
 }
