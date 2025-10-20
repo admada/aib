@@ -50,6 +50,36 @@ function Run-WindowsRestart {
     Restart-Computer -Force
 }
 
+function Enable-Intune {
+Write-Host "Enable Intune setting"
+$key = 'SYSTEM\CurrentControlSet\Control\CloudDomainJoin\TenantInfo\*'
+$keyinfo = Get-Item "HKLM:\$key"
+$url = $keyinfo.name
+$url = $url.Split("\")[-1]
+$path = "HKLM:\SYSTEM\CurrentControlSet\Control\CloudDomainJoin\TenantInfo\\$url"
+
+New-ItemProperty -LiteralPath $path -Name 'MdmEnrollmentUrl' -Value 'https://enrollment.manage.microsoft.com/enrollmentserver/discovery.svc' -PropertyType String -Force -ea SilentlyContinue;
+New-ItemProperty -LiteralPath $path  -Name 'MdmTermsOfUseUrl' -Value 'https://portal.manage.microsoft.com/TermsofUse.aspx' -PropertyType String -Force -ea SilentlyContinue;
+New-ItemProperty -LiteralPath $path -Name 'MdmComplianceUrl' -Value 'https://portal.manage.microsoft.com/?portalAction=Compliance' -PropertyType String -Force -ea SilentlyContinue;
+Start-Sleep 5
+
+# Make sure the MDM keys are set for device-based enrollment
+$k = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\MDM"
+if (-not (Test-Path $k)) { New-Item -Path $k -Force | Out-Null }
+Set-ItemProperty -Path $k -Name AutoEnrollMDM -Type DWord -Value 1
+Set-ItemProperty -Path $k -Name UseAADDeviceCredentials -Type DWord -Value 1
+Set-ItemProperty -Path $k -Name UseDeviceCredentials -Type DWord -Value 1
+
+# Add ScheduledTaskTrigger
+$triggers = @()
+$triggers += New-ScheduledTaskTrigger -At (get-date) -Once -RepetitionInterval (New-TimeSpan -Minutes 1)
+$User = "SYSTEM"
+$Action = New-ScheduledTaskAction -Execute "%windir%\system32\deviceenroller.exe" -Argument "/c /AutoEnrollMDMUsingAADDeviceCredential"
+$Null = Register-ScheduledTask -TaskName "TriggerEnrollment" -Trigger $triggers -User $User -Action $Action -Force
+
+}
+
+
 function Cleanup-DownloadedScripts {
     param (
         [string[]]$Files
@@ -85,6 +115,7 @@ $DownloadedHelpers = @(
     Join-Path $avdPath "multiMediaRedirection.ps1",
     Join-Path $avdPath "windowsOptimization.ps1",
     Join-Path $avdPath "removeAppxPackages.ps1"
+    
 )
 
 # --- Sequence starts here ---
@@ -119,10 +150,12 @@ try {
     # Remove Appx Packages
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/RemoveAppxPackages.ps1" -Destination "$avdPath\removeAppxPackages.ps1"
     Run-AVDScript "C:\AVDImage\removeAppxPackages.ps1 -AppxPackages 'Microsoft.XboxApp','Microsoft.ZuneVideo','Microsoft.ZuneMusic','Microsoft.YourPhone','Microsoft.XboxSpeechToTextOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxGamingOverlay','Microsoft.XboxGameOverlay','Microsoft.Xbox.TCUI','Microsoft.WindowsTerminal','Microsoft.WindowsSoundRecorder','Microsoft.WindowsMaps','Microsoft.WindowsFeedbackHub','Microsoft.windowscommunicationsapps','Microsoft.WindowsCamera','Microsoft.WindowsCalculator','Microsoft.WindowsAlarms','Microsoft.Windows.Photos','Microsoft.Todos','Microsoft.SkypeApp','Microsoft.ScreenSketch','Microsoft.PowerAutomateDesktop','Microsoft.People','Microsoft.MSPaint','Microsoft.MicrosoftStickyNotes','Microsoft.MicrosoftSolitaireCollection','Microsoft.Office.OneNote','Microsoft.MicrosoftOfficeHub','Microsoft.Getstarted','Microsoft.GamingApp','Microsoft.BingWeather','Microsoft.GetHelp','Microsoft.BingNews','Clipchamp.Clipchamp'"
+    Enable-Intune
     Run-WindowsUpdate
     Run-WindowsRestart -Timeout "5m"
 }
 finally {
+    
     # Cleanup downloaded helper scripts (logged in transcript)
     Cleanup-DownloadedScripts -Files $DownloadedHelpers
 
