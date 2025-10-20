@@ -6,13 +6,16 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# ===== Paths & transcript =====
-$avdPath = 'C:\AVDImage'
-if (-not (Test-Path $avdPath)) {
-    New-Item -ItemType Directory -Path $avdPath | Out-Null
+# ===== Paths & transcript (moved away from C:\AVDImage which MS script deletes) =====
+$workPath = 'C:\AIBWork'
+$logPath  = 'C:\AIBLogs'
+
+foreach ($p in @($workPath, $logPath)) {
+    if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p | Out-Null }
 }
+
 $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-$logFile  = "$avdPath\imagebuilder_$timestamp.log"
+$logFile   = "$logPath\imagebuilder_$timestamp.log"
 Start-Transcript -Path $logFile -Append
 
 function Write-Stage {
@@ -129,19 +132,19 @@ $urls = @{
     RemoveAppx           = "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/RemoveAppxPackages.ps1"
 }
 
-# ===== Destination paths (strings only; no Join-Path array pitfalls) =====
+# ===== Destination paths (strings only) =====
 $paths = @{
-    InstallLanguagePacks = "$avdPath\InstallLanguagePacks.ps1"
-    SetDefaultLang       = "$avdPath\SetDefaultLang.ps1"
-    TimezoneRedirect     = "$avdPath\TimezoneRedirection.ps1"
-    DisableStorageSense  = "$avdPath\DisableStorageSense.ps1"
-    RDPShortpath         = "$avdPath\RDPShortpath.ps1"
-    MultiMediaRedirect   = "$avdPath\MultiMediaRedirection.ps1"
-    WindowsOptimization  = "$avdPath\WindowsOptimization.ps1"
-    RemoveAppx           = "$avdPath\RemoveAppxPackages.ps1"
+    InstallLanguagePacks = "$workPath\InstallLanguagePacks.ps1"
+    SetDefaultLang       = "$workPath\SetDefaultLang.ps1"
+    TimezoneRedirect     = "$workPath\TimezoneRedirection.ps1"
+    DisableStorageSense  = "$workPath\DisableStorageSense.ps1"
+    RDPShortpath         = "$workPath\RDPShortpath.ps1"
+    MultiMediaRedirect   = "$workPath\MultiMediaRedirection.ps1"
+    WindowsOptimization  = "$workPath\WindowsOptimization.ps1"
+    RemoveAppx           = "$workPath\RemoveAppxPackages.ps1"
 }
 
-# Keep a list for cleanup later (again: plain strings)
+# Keep a list for cleanup later
 $downloadedHelpers = @(
     $paths.InstallLanguagePacks,
     $paths.SetDefaultLang,
@@ -160,6 +163,12 @@ try {
     # 1) Language packs (example: Dutch (Netherlands))
     Download-AVDScript -Uri $urls.InstallLanguagePacks -Destination $paths.InstallLanguagePacks
     Run-AVDScript "`"$($paths.InstallLanguagePacks)`" -LanguageList 'Dutch (Netherlands)'"
+
+    # Some Microsoft helper scripts delete C:\AVDImage; make sure our work folder still exists.
+    if (-not (Test-Path $workPath)) {
+        Write-Stage "Re-creating work folder after language pack step"
+        New-Item -ItemType Directory -Path $workPath | Out-Null
+    }
 
     # 2) Set default language
     Download-AVDScript -Uri $urls.SetDefaultLang -Destination $paths.SetDefaultLang
@@ -207,6 +216,6 @@ finally {
     # Always do these even if a step failed
     SysprepVmModeFix
     Cleanup-DownloadedScripts -Files $downloadedHelpers
-    Stop-Transcript
+    try { Stop-Transcript } catch {}
     Write-Host "Transcript saved to $logFile"
 }
