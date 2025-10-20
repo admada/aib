@@ -1,193 +1,116 @@
-<#
-.SYNOPSIS
-  AVD Image Builder Script (imagebuilder_rdv.ps1)
+# AVD Image Builder Script (no-reboot)
+$ErrorActionPreference = 'Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-#>
-
-# Ensure working folder exists
+# Ensure working folder & transcript
 $avdPath = "C:\AVDImage"
-if (-not (Test-Path $avdPath)) {
-    New-Item -ItemType Directory -Path $avdPath | Out-Null
-}
-
-# Setup transcript logging
+if (-not (Test-Path $avdPath)) { New-Item -ItemType Directory -Path $avdPath | Out-Null }
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$logFile   = Join-Path $avdPath "imagebuilder_$timestamp.log"
+$logFile = Join-Path $avdPath "imagebuilder_$timestamp.log"
 Start-Transcript -Path $logFile -Append
 
 function Download-AVDScript {
-    param (
-        [Parameter(Mandatory)][string]$Uri,
-        [Parameter(Mandatory)][string]$Destination
-    )
-    Write-Host "Downloading $Uri to $Destination"
+    param([Parameter(Mandatory)][string]$Uri,[Parameter(Mandatory)][string]$Destination)
     Invoke-WebRequest -Uri $Uri -OutFile $Destination -UseBasicParsing
 }
-
 function Run-AVDScript {
-    param (
-        [Parameter(Mandatory)][string]$Command
-    )
-    Write-Host "Running: $Command"
-    Invoke-Expression $Command
-}
-
-function Run-WindowsUpdate {
-    Write-Host "Installing Windows Updates..."
-    try {
-        Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -AutoReboot -ErrorAction Stop
-    } catch {
-        Write-Warning "Windows Update module not available. Please ensure PSWindowsUpdate is installed."
-    }
-}
-
-function Run-WindowsRestart {
-    param (
-        [string]$Timeout = "1m"
-    )
-    Write-Host "Restarting Windows in $Timeout..."
-    Start-Sleep -Seconds ([System.Management.Automation.LanguagePrimitives]::ConvertTo($Timeout,[timespan])).TotalSeconds
-    Restart-Computer -Force
+    param([Parameter(Mandatory)][string]$Command)
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command $Command
 }
 
 function Enable-Intune {
-Write-Host "Enable Intune setting"
-$key = 'SYSTEM\CurrentControlSet\Control\CloudDomainJoin\TenantInfo\*'
-$keyinfo = Get-Item "HKLM:\$key"
-$url = $keyinfo.name
-$url = $url.Split("\")[-1]
-$path = "HKLM:\SYSTEM\CurrentControlSet\Control\CloudDomainJoin\TenantInfo\\$url"
-
-New-ItemProperty -LiteralPath $path -Name 'MdmEnrollmentUrl' -Value 'https://enrollment.manage.microsoft.com/enrollmentserver/discovery.svc' -PropertyType String -Force -ea SilentlyContinue;
-New-ItemProperty -LiteralPath $path  -Name 'MdmTermsOfUseUrl' -Value 'https://portal.manage.microsoft.com/TermsofUse.aspx' -PropertyType String -Force -ea SilentlyContinue;
-New-ItemProperty -LiteralPath $path -Name 'MdmComplianceUrl' -Value 'https://portal.manage.microsoft.com/?portalAction=Compliance' -PropertyType String -Force -ea SilentlyContinue;
-Start-Sleep 5
-
-# Make sure the MDM keys are set for device-based enrollment
-$k = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\MDM"
-if (-not (Test-Path $k)) { New-Item -Path $k -Force | Out-Null }
-Set-ItemProperty -Path $k -Name AutoEnrollMDM -Type DWord -Value 1
-Set-ItemProperty -Path $k -Name UseAADDeviceCredentials -Type DWord -Value 1
-Set-ItemProperty -Path $k -Name UseDeviceCredentials -Type DWord -Value 1
-
-# Add ScheduledTaskTrigger
-$triggers = @()
-$triggers += New-ScheduledTaskTrigger -At (get-date) -Once -RepetitionInterval (New-TimeSpan -Minutes 1)
-$User = "SYSTEM"
-$Action = New-ScheduledTaskAction -Execute "%windir%\system32\deviceenroller.exe" -Argument "/c /AutoEnrollMDMUsingAADDeviceCredential"
-$Null = Register-ScheduledTask -TaskName "TriggerEnrollment" -Trigger $triggers -User $User -Action $Action -Force
-
+    $key = 'SYSTEM\CurrentControlSet\Control\CloudDomainJoin\TenantInfo\*'
+    $keyinfo = Get-Item "HKLM:\$key" -ErrorAction SilentlyContinue
+    if ($null -ne $keyinfo) {
+        $url = ($keyinfo.Name.Split('\')[-1])
+        $path = "HKLM:\SYSTEM\CurrentControlSet\Control\CloudDomainJoin\TenantInfo\$url"
+        New-ItemProperty -LiteralPath $path -Name 'MdmEnrollmentUrl' -Value 'https://enrollment.manage.microsoft.com/enrollmentserver/discovery.svc' -PropertyType String -Force -ea SilentlyContinue
+        New-ItemProperty -LiteralPath $path -Name 'MdmTermsOfUseUrl' -Value 'https://portal.manage.microsoft.com/TermsofUse.aspx' -PropertyType String -Force -ea SilentlyContinue
+        New-ItemProperty -LiteralPath $path -Name 'MdmComplianceUrl' -Value 'https://portal.manage.microsoft.com/?portalAction=Compliance' -PropertyType String -Force -ea SilentlyContinue
+    }
+    $k = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\MDM"
+    if (-not (Test-Path $k)) { New-Item -Path $k -Force | Out-Null }
+    Set-ItemProperty -Path $k -Name AutoEnrollMDM -Type DWord -Value 1
+    Set-ItemProperty -Path $k -Name UseAADDeviceCredentials -Type DWord -Value 1
+    Set-ItemProperty -Path $k -Name UseDeviceCredentials -Type DWord -Value 1
+    $triggers = @()
+    $triggers += New-ScheduledTaskTrigger -At (Get-Date) -Once -RepetitionInterval (New-TimeSpan -Minutes 1)
+    Register-ScheduledTask -TaskName "TriggerEnrollment" -Trigger $triggers -User "SYSTEM" `
+        -Action (New-ScheduledTaskAction -Execute "$env:windir\system32\deviceenroller.exe" -Argument "/c /AutoEnrollMDMUsingAADDeviceCredential") -Force | Out-Null
 }
 
 function Set-Defender-Excludes {
-try {
-     $filelist = `
-  "%ProgramFiles%\FSLogix\Apps\frxdrv.sys", `
-  "%ProgramFiles%\FSLogix\Apps\frxdrvvt.sys", `
-  "%ProgramFiles%\FSLogix\Apps\frxccd.sys", `
-  "%TEMP%\*.VHD", `
-  "%TEMP%\*.VHDX", `
-  "%Windir%\TEMP\*.VHD", `
-  "%Windir%\TEMP\*.VHDX" `
-
-    $processlist = `
-    "%ProgramFiles%\FSLogix\Apps\frxccd.exe", `
-    "%ProgramFiles%\FSLogix\Apps\frxccds.exe", `
-    "%ProgramFiles%\FSLogix\Apps\frxsvc.exe"
-
-    Foreach($item in $filelist){
-        Add-MpPreference -ExclusionPath $item}
-    Foreach($item in $processlist){
-        Add-MpPreference -ExclusionProcess $item}
-
-
-    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Cache\*.VHD"
-    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Cache\*.VHDX"
-    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Proxy\*.VHD"
-    Add-MpPreference -ExclusionPath "%ProgramData%\FSLogix\Proxy\*.VHDX"
-}
-catch {
-     Write-Host "AVD AIB Customization - Install FSLogix : Exception occurred while adding exclusions for Microsoft Defender"
-     Write-Host $PSItem.Exception
-}
-
-Write-Host "Finished adding exclusions for Microsoft Defender"
-
+    try {
+        $filelist = @(
+            "$env:ProgramFiles\FSLogix\Apps\frxdrv.sys",
+            "$env:ProgramFiles\FSLogix\Apps\frxdrvvt.sys",
+            "$env:ProgramFiles\FSLogix\Apps\frxccd.sys",
+            "$env:TEMP\*.VHD",
+            "$env:TEMP\*.VHDX",
+            "$env:WINDIR\TEMP\*.VHD",
+            "$env:WINDIR\TEMP\*.VHDX"
+        )
+        $processlist = @(
+            "$env:ProgramFiles\FSLogix\Apps\frxccd.exe",
+            "$env:ProgramFiles\FSLogix\Apps\frxccds.exe",
+            "$env:ProgramFiles\FSLogix\Apps\frxsvc.exe"
+        )
+        foreach($p in $filelist){ Add-MpPreference -ExclusionPath $p }
+        foreach($p in $processlist){ Add-MpPreference -ExclusionProcess $p }
+        Add-MpPreference -ExclusionPath "$env:ProgramData\FSLogix\Cache\*.VHD"
+        Add-MpPreference -ExclusionPath "$env:ProgramData\FSLogix\Cache\*.VHDX"
+        Add-MpPreference -ExclusionPath "$env:ProgramData\FSLogix\Proxy\*.VHD"
+        Add-MpPreference -ExclusionPath "$env:ProgramData\FSLogix\Proxy\*.VHDX"
+    } catch {
+        Write-Warning "Failed to add Defender exclusions: $($_.Exception.Message)"
+    }
 }
 
 function Sysprep-Fix {
-Write-Host "Sysprep fix, remove delay Windows installer"
-try {
-    ((Get-Content -path C:\DeprovisioningScript.ps1 -Raw) -replace 'Sysprep.exe /oobe /generalize /quiet /quit', 'Sysprep.exe /oobe /generalize /quit /mode:vm' ) | Set-Content -Path C:\DeprovisioningScript.ps1
-    Write-Host "Sysprep Mode:VM fix applied"
+    try {
+        ((Get-Content -path C:\DeprovisioningScript.ps1 -Raw) -replace 'Sysprep.exe /oobe /generalize /quiet /quit','Sysprep.exe /oobe /generalize /quit /mode:vm') |
+            Set-Content -Path C:\DeprovisioningScript.ps1
+    } catch {
+        Write-Warning "Sysprep fix failed: $($_.Exception.Message)"
+    }
 }
-catch {
-    $ErrorMessage = $_.Exception.message
-    Write-Host "Error updating script: $ErrorMessage"
-}
-}
-
 
 function Cleanup-DownloadedScripts {
-    param (
-        [string[]]$Files
-    )
-    Write-Host "Starting cleanup of downloaded helper scripts..."
-    $selfPath = $null
-    try { $selfPath = (Resolve-Path -ErrorAction SilentlyContinue $PSCommandPath).Path } catch {}
-
+    param([string[]]$Files)
     foreach ($f in $Files) {
-        try {
-            if (Test-Path $f) {
-                $resolved = (Resolve-Path $f).Path
-                if ($selfPath -and ($resolved -ieq $selfPath)) {
-                    Write-Host "Skipping self script: $resolved"
-                    continue
-                }
-                Write-Host "Removing $resolved"
-                Remove-Item -Path $resolved -Force -ErrorAction Stop
-            } else {
-                Write-Host "Not found (skip): $f"
-            }
-        } catch {
-            Write-Warning "Failed to remove '$f': $($_.Exception.Message)"
-        }
+        try { if (Test-Path $f) { Remove-Item -Path $f -Force -ErrorAction Stop } } catch { }
     }
-    Write-Host "Cleanup complete."
 }
 
-# Track the helper scripts we download so we can remove them later
+# --- Sequence (no reboot, no PSWindowsUpdate) ---
 $DownloadedHelpers = @(
     Join-Path $avdPath "installLanguagePacks.ps1",
     Join-Path $avdPath "setDefaultLanguage.ps1",
     Join-Path $avdPath "multiMediaRedirection.ps1",
     Join-Path $avdPath "windowsOptimization.ps1",
-    Join-Path $avdPath "removeAppxPackages.ps1",
-    
-    
+    Join-Path $avdPath "removeAppxPackages.ps1"
 )
 
-# --- Sequence starts here ---
 try {
-    # Install Language Packs
+    # Language packs
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/InstallLanguagePacks.ps1" -Destination "$avdPath\installLanguagePacks.ps1"
     Run-AVDScript "C:\AVDImage\installLanguagePacks.ps1 -LanguageList 'Dutch (Netherlands)'"
-    Run-WindowsRestart -Timeout "10m"
 
-    # Set Default Language
+    # Default language
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/SetDefaultLang.ps1" -Destination "$avdPath\setDefaultLanguage.ps1"
     Run-AVDScript "C:\AVDImage\setDefaultLanguage.ps1 -Language 'Dutch (Netherlands)'"
 
-    # TimeZone Redirection
-    Run-AVDScript "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/TimezoneRedirection.ps1' | Invoke-Expression"
+    # Timezone redirection / Storage Sense / RDP Shortpath (download then run)
+    Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/TimezoneRedirection.ps1" -Destination "$avdPath\TimezoneRedirection.ps1"
+    Run-AVDScript "C:\AVDImage\TimezoneRedirection.ps1"
 
-    # Disable Storage Sense
-    Run-AVDScript "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/DisableStorageSense.ps1' | Invoke-Expression"
+    Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/DisableStorageSense.ps1" -Destination "$avdPath\DisableStorageSense.ps1"
+    Run-AVDScript "C:\AVDImage\DisableStorageSense.ps1"
 
-    # Configure RDP Shortpath
-    Run-AVDScript "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/RDPShortpath.ps1' | Invoke-Expression"
+    Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/RDPShortpath.ps1" -Destination "$avdPath\RDPShortpath.ps1"
+    Run-AVDScript "C:\AVDImage\RDPShortpath.ps1"
 
-    # MultiMedia Redirection
+    # Multimedia redirection
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/MultiMediaRedirection.ps1" -Destination "$avdPath\multiMediaRedirection.ps1"
     Run-AVDScript "C:\AVDImage\multiMediaRedirection.ps1 -VCRedistributableLink 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -EnableEdge 'true' -EnableChrome 'true'"
 
@@ -195,30 +118,17 @@ try {
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/WindowsOptimization.ps1" -Destination "$avdPath\windowsOptimization.ps1"
     Run-AVDScript "C:\AVDImage\windowsOptimization.ps1 -Optimizations 'WindowsMediaPlayer','ScheduledTasks','DefaultUserSettings','Autologgers','Services','NetworkOptimizations','LGPO','DiskCleanup','Edge','RemoveLegacyIE','RemoveOneDrive'"
 
-
-    # Remove Appx Packages
+    # Remove Appx
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/RemoveAppxPackages.ps1" -Destination "$avdPath\removeAppxPackages.ps1"
     Run-AVDScript "C:\AVDImage\removeAppxPackages.ps1 -AppxPackages 'Microsoft.XboxApp','Microsoft.ZuneVideo','Microsoft.ZuneMusic','Microsoft.YourPhone','Microsoft.XboxSpeechToTextOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxGamingOverlay','Microsoft.XboxGameOverlay','Microsoft.Xbox.TCUI','Microsoft.WindowsTerminal','Microsoft.WindowsSoundRecorder','Microsoft.WindowsMaps','Microsoft.WindowsFeedbackHub','Microsoft.windowscommunicationsapps','Microsoft.WindowsCamera','Microsoft.WindowsCalculator','Microsoft.WindowsAlarms','Microsoft.Windows.Photos','Microsoft.Todos','Microsoft.SkypeApp','Microsoft.ScreenSketch','Microsoft.PowerAutomateDesktop','Microsoft.People','Microsoft.MSPaint','Microsoft.MicrosoftStickyNotes','Microsoft.MicrosoftSolitaireCollection','Microsoft.Office.OneNote','Microsoft.MicrosoftOfficeHub','Microsoft.Getstarted','Microsoft.GamingApp','Microsoft.BingWeather','Microsoft.GetHelp','Microsoft.BingNews','Clipchamp.Clipchamp'"
-    
-    # Defender Excludes
-    Set-Defender-Excludes
-    
-    # Set Intune settings
-    Enable-Intune
-    
-    # Run-WindowsUpdate ## Disabled updates
-    Run-WindowsRestart -Timeout "5m"
-}
-finally {
-    # Apply Sysprep fix
-    Sysprep-Fix
-    # Cleanup downloaded helper scripts (logged in transcript)
-    Cleanup-DownloadedScripts -Files $DownloadedHelpers
 
-    # Execute sysprep 
-#    Write-host "Execute SysPrep, sealing image"
-#    Run-AVDScript "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/AdminSysPrep.ps1' | Invoke-Expression"
-    
+    # Defender & Intune
+    Set-Defender-Excludes
+    Enable-Intune
+
+} finally {
+    Sysprep-Fix
+    Cleanup-DownloadedScripts -Files $DownloadedHelpers
     Stop-Transcript
     Write-Host "Transcript saved to $logFile"
 }
