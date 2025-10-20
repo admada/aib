@@ -114,7 +114,8 @@ $DownloadedHelpers = @(
     Join-Path $avdPath "setDefaultLanguage.ps1",
     Join-Path $avdPath "multiMediaRedirection.ps1",
     Join-Path $avdPath "windowsOptimization.ps1",
-    Join-Path $avdPath "removeAppxPackages.ps1"
+    Join-Path $avdPath "removeAppxPackages.ps1",
+    
     
 )
 
@@ -151,14 +152,16 @@ try {
     Download-AVDScript -Uri "https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/RemoveAppxPackages.ps1" -Destination "$avdPath\removeAppxPackages.ps1"
     Run-AVDScript "C:\AVDImage\removeAppxPackages.ps1 -AppxPackages 'Microsoft.XboxApp','Microsoft.ZuneVideo','Microsoft.ZuneMusic','Microsoft.YourPhone','Microsoft.XboxSpeechToTextOverlay','Microsoft.XboxIdentityProvider','Microsoft.XboxGamingOverlay','Microsoft.XboxGameOverlay','Microsoft.Xbox.TCUI','Microsoft.WindowsTerminal','Microsoft.WindowsSoundRecorder','Microsoft.WindowsMaps','Microsoft.WindowsFeedbackHub','Microsoft.windowscommunicationsapps','Microsoft.WindowsCamera','Microsoft.WindowsCalculator','Microsoft.WindowsAlarms','Microsoft.Windows.Photos','Microsoft.Todos','Microsoft.SkypeApp','Microsoft.ScreenSketch','Microsoft.PowerAutomateDesktop','Microsoft.People','Microsoft.MSPaint','Microsoft.MicrosoftStickyNotes','Microsoft.MicrosoftSolitaireCollection','Microsoft.Office.OneNote','Microsoft.MicrosoftOfficeHub','Microsoft.Getstarted','Microsoft.GamingApp','Microsoft.BingWeather','Microsoft.GetHelp','Microsoft.BingNews','Clipchamp.Clipchamp'"
     Enable-Intune
-    Run-WindowsUpdate
+    # Run-WindowsUpdate ## Disabled updates
     Run-WindowsRestart -Timeout "5m"
 }
 finally {
     
     # Cleanup downloaded helper scripts (logged in transcript)
     Cleanup-DownloadedScripts -Files $DownloadedHelpers
-
+    # Execute sysprep 
+    Write-host "Execute Systprep, sealing image"
+    Run-AVDScript "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/AdminSysPrep.ps1' | Invoke-Expression"
     Stop-Transcript
     Write-Host "Transcript saved to $logFile"
 }
