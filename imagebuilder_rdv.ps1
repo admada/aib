@@ -115,6 +115,19 @@ Write-Host "Finished adding exclusions for Microsoft Defender"
 
 }
 
+function Sysprep-Fix {
+Write-Host "Sysprep fix, remove delay Windows installer"
+try {
+    ((Get-Content -path C:\DeprovisioningScript.ps1 -Raw) -replace 'Sysprep.exe /oobe /generalize /quiet /quit', 'Sysprep.exe /oobe /generalize /quit /mode:vm' ) | Set-Content -Path C:\DeprovisioningScript.ps1
+    Write-Host "Sysprep Mode:VM fix applied"
+}
+catch {
+    $ErrorMessage = $_.Exception.message
+    Write-Host "Error updating script: $ErrorMessage"
+}
+}
+
+
 function Cleanup-DownloadedScripts {
     param (
         [string[]]$Files
@@ -197,12 +210,15 @@ try {
     Run-WindowsRestart -Timeout "5m"
 }
 finally {
-    
+    # Apply Sysprep fix
+    Sysprep-Fix
     # Cleanup downloaded helper scripts (logged in transcript)
     Cleanup-DownloadedScripts -Files $DownloadedHelpers
+
     # Execute sysprep 
-    Write-host "Execute Systprep, sealing image"
-    Run-AVDScript "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/AdminSysPrep.ps1' | Invoke-Expression"
+#    Write-host "Execute SysPrep, sealing image"
+#    Run-AVDScript "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/CustomImageTemplateScripts/CustomImageTemplateScripts_2024-03-27/AdminSysPrep.ps1' | Invoke-Expression"
+    
     Stop-Transcript
     Write-Host "Transcript saved to $logFile"
 }
