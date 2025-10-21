@@ -1,3 +1,24 @@
+# ===== Strict mode & TLS =====
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# ===== Paths & transcript =====
+$avdPath = 'C:\AVDImage'
+if (-not (Test-Path $avdPath)) {
+    New-Item -ItemType Directory -Path $avdPath | Out-Null
+}
+$timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+$logFile  = "$avdPath\imagebuilder_$timestamp.log"
+Start-Transcript -Path $logFile -Append
+
+function Write-Stage {
+    param([Parameter(Mandatory)][string]$Message)
+    Write-Host ('-'*80)
+    Write-Host "[AIB] $Message"
+    Write-Host ('-'*80)
+}
+
 function Enable-IntuneAutoEnroll {
     Write-Stage "Configuring Intune Auto-enrollment (MDM)"
     try {
@@ -16,6 +37,28 @@ function Enable-IntuneAutoEnroll {
         Write-Warning "MDM enrollment config failed: $($_.Exception.Message)"
     }
 }
+
+function write-urls {
+    Write-Stage "Configuring Intune Auto-enrollment uri's"
+    try {
+ $key = 'SYSTEM\CurrentControlSet\Control\CloudDomainJoin\TenantInfo\*'
+$keyinfo = Get-Item "HKLM:\$key"
+$url = $keyinfo.name
+$url = $url.Split("\")[-1]
+$path = "HKLM:\SYSTEM\CurrentControlSet\Control\CloudDomainJoin\TenantInfo\\$url"
+
+New-ItemProperty -LiteralPath $path -Name 'MdmEnrollmentUrl' -Value 'https://enrollment.manage.microsoft.com/enrollmentserver/discovery.svc' -PropertyType String -Force -ea SilentlyContinue;
+New-ItemProperty -LiteralPath $path  -Name 'MdmTermsOfUseUrl' -Value 'https://portal.manage.microsoft.com/TermsofUse.aspx' -PropertyType String -Force -ea SilentlyContinue;
+New-ItemProperty -LiteralPath $path -Name 'MdmComplianceUrl' -Value 'https://portal.manage.microsoft.com/?portalAction=Compliance' -PropertyType String -Force -ea SilentlyContinue;
+
+    }
+    catch {
+    Write-Warning "Url writing failed: $($_.Exception.Message)"
+    }
+
+}
+
+
 
 function Set-DefenderExclusions {
     Write-Stage "Adding Microsoft Defender exclusions for FSLogix"
@@ -46,6 +89,26 @@ function Set-DefenderExclusions {
     }
 }
 
+
+try {
+Write-Stage "Starting AVD image customization"
+
+# 1) Intune Auto Enrollment
 Enable-IntuneAutoEnroll
+Start-Sleep -Seconds 3
+
+# 2) Intune Auto Enrollment
+write-urls
+Start-Sleep -Seconds 3
+
+# 3) Set defender excludes
 Set-DefenderExclusions
+Start-Sleep -Seconds 3
+
+}
+finally {
+    Stop-Transcript
+    Write-Host "Transcript saved to $logFile"
+}
+
 
